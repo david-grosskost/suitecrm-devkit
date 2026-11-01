@@ -1,0 +1,80 @@
+# Checks shared by every SuiteCRM project, called by each project's CI:
+#   jobs:
+#     checks:
+#       uses: david-grosskost/suitecrm-devkit/.github/workflows/checks.yml@vX.Y.Z
+# Runs the same make commands as on a developer machine, with Docker.
+name: Checks
+
+on:
+  workflow_call:
+
+jobs:
+  # Runs the commit-msg hook on every pushed commit, so that commits made
+  # without the local hook (web UI, other clone…) are checked too.
+  commit-msg:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install the devkit
+        run: make
+
+      - name: Check commit messages
+        env:
+          EVENT: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.event.after }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          # The hooks live in the devkit: vendor/ in a project, . in the devkit itself.
+          devkit=vendor/david-grosskost/suitecrm-devkit
+          [ -d "$devkit" ] || devkit=.
+
+          if [ "$EVENT" = pull_request ]; then
+            range="$PR_BASE..$PR_HEAD"
+          elif [ "$BEFORE" = 0000000000000000000000000000000000000000 ]; then
+            # New branch: only the commits not already on the default branch.
+            range="origin/$DEFAULT_BRANCH..$AFTER"
+            [ "$(git rev-parse "origin/$DEFAULT_BRANCH")" = "$AFTER" ] && range="$AFTER~1..$AFTER"
+          else
+            range="$BEFORE..$AFTER"
+          fi
+
+          msg="$(mktemp)"
+          failed=0
+          for sha in $(git rev-list --reverse "$range"); do
+            git log -1 --format=%B "$sha" > "$msg"
+            if ! "$devkit/.githooks/commit-msg" "$msg"; then
+              echo "::error::commit ${sha:0:7} : message non conforme"
+              failed=1
+            fi
+          done
+          exit "$failed"
+
+  # Pre-commit checks on every tracked file (scripts, secrets, sensitive files,
+  # shellcheck), then the quality checks: hadolint, PHP-CS-Fixer, PHPStan.
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install the devkit and its tools (gitleaks, shellcheck)
+        run: |
+          make
+          make git@hooks
+
+      - name: Pre-commit checks on every file
+        run: |
+          devkit=vendor/david-grosskost/suitecrm-devkit
+          [ -d "$devkit" ] || devkit=.
+          "$devkit/.githooks/pre-commit" --all
+
+      - name: Lint (hadolint, PHP-CS-Fixer, shellcheck)
+        run: make quality@lint
+
+      - name: Static analysis (PHPStan)
+        run: make quality@stan

@@ -1,0 +1,10 @@
+# CI of the devkit itself: the same checks as every project.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  checks:
+    uses: ./.github/workflows/checks.yml
