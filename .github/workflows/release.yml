@@ -12,7 +12,7 @@
 #    GHCR, tagged with the version. Done here and not on the tag event: a tag
 #    created with GITHUB_TOKEN does not trigger other workflows.
 #
-# Optional secret RELEASE_PLEASE_TOKEN (personal access token): without it,
+# Optional secret RELEASE_TOKEN (personal access token): without it,
 # release pull requests are opened with GITHUB_TOKEN and do not trigger the CI.
 name: Release
 
@@ -28,7 +28,7 @@ on:
         type: string
         default: base
     secrets:
-      RELEASE_PLEASE_TOKEN:
+      RELEASE_TOKEN:
         required: false
 
 jobs:
@@ -41,7 +41,7 @@ jobs:
       - id: release
         uses: googleapis/release-please-action@v4
         with:
-          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
+          token: ${{ secrets.RELEASE_TOKEN || github.token }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
