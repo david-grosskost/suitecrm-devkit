@@ -1,0 +1,7 @@
+{
+    "name": "david-grosskost/suitecrm-devkit",
+    "description": "Shared tooling of the SuiteCRM projects: make commands, Git hooks, quality configs, CI workflows.",
+    "type": "library",
+    "license": "proprietary",
+    "require": {}
+}

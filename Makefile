@@ -1,10 +1,20 @@
 # Convention: make <domain>@<action> runs .make/scripts/<domain>/<action>.sh
 # Each .make/<domain>.mk only declares targets; the logic lives in the scripts.
+#
+# Shared by every SuiteCRM project through Composer: a project's own Makefile
+# includes vendor/david-grosskost/suitecrm-devkit/Makefile. The project can add
+# its own commands in its .make/*.mk, listed with the devkit ones.
 
 # Must be set before any include, otherwise make defaults to the first target.
 .DEFAULT_GOAL := .list
 
-include $(wildcard .make/*.mk)
+# Directory of this Makefile: "." in the devkit itself, the vendor path in a project.
+DEVKIT_DIR := $(patsubst %/,%,$(dir $(lastword $(MAKEFILE_LIST))))
+
+DEVKIT_MK := $(wildcard $(DEVKIT_DIR)/.make/*.mk)
+PROJECT_MK := $(if $(filter .,$(DEVKIT_DIR)),,$(wildcard .make/*.mk))
+
+include $(DEVKIT_MK) $(PROJECT_MK)
 
 # Lists every <domain>@<action> target declared in a .PHONY line.
 .PHONY: .list

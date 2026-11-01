@@ -30,6 +30,15 @@ run () {
   "$@"
 }
 
+# Root of the devkit, relative to the project root (the current directory):
+# "." in the devkit itself, vendor/david-grosskost/suitecrm-devkit in a project.
+# Relative on purpose: Git for Windows does not understand /f/... paths.
+devkit_dir () {
+  local root
+  root="$(cd "$SCRIPTS/../.." && pwd)"
+  if [ "$root" = "$PWD" ]; then echo "."; else echo "${root#"$PWD"/}"; fi
+}
+
 # Reads a KEY=value file into the environment, without executing it.
 # A variable already set (command line, or a file read before) is kept.
 #
