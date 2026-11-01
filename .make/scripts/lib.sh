@@ -32,11 +32,13 @@ run () {
 
 # Root of the devkit, relative to the project root (the current directory):
 # "." in the devkit itself, vendor/david-grosskost/suitecrm-devkit in a project.
-# Relative on purpose: Git for Windows does not understand /f/... paths.
+# Relative on purpose: the project folder can be moved. Both paths come from
+# pwd -P: under Git Bash, $PWD may be F:/… while cd gives /f/….
 devkit_dir () {
-  local root
-  root="$(cd "$SCRIPTS/../.." && pwd)"
-  if [ "$root" = "$PWD" ]; then echo "."; else echo "${root#"$PWD"/}"; fi
+  local root here
+  root="$(cd "$SCRIPTS/../.." && pwd -P)"
+  here="$(pwd -P)"
+  if [ "$root" = "$here" ]; then echo "."; else echo "${root#"$here"/}"; fi
 }
 
 # Reads a KEY=value file into the environment, without executing it.
