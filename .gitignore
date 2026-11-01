@@ -1,0 +1,5 @@
+# Project tools (make git@hooks)
+/.tools/
+
+# Composer dependencies
+/vendor/

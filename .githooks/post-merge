@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# After a pull or merge, tells what this machine needs to apply by hand:
+# settings added to .env.example but missing from .env, and containers to
+# recreate when a compose file changed. Never blocks: the merge is done.
+# Enabled by: make git@hooks
+set -uo pipefail
+
+changed="$(git diff --name-only ORIG_HEAD HEAD 2>/dev/null)" || exit 0
+
+# Keys (KEY=…) defined in a .env-style file, one per line.
+#
+# @param string $1 File
+keys () { sed -nE 's/^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*)=.*/\1/p' "$1" | sort -u; }
+
+if grep -qx '.env.example' <<<"$changed" && [ -f .env ]; then
+  missing="$(comm -23 <(keys .env.example) <(keys .env))"
+  if [ -n "$missing" ]; then
+    printf '\npost-merge : nouveaux réglages dans .env.example, absents de ton .env :\n' >&2
+    while IFS= read -r key; do
+      printf '  %s\n' "$(grep -m1 -E "^[[:space:]]*$key=" .env.example)" >&2
+    done <<<"$missing"
+    printf '  → les ajouter à .env, en adaptant la valeur à cette machine\n' >&2
+  fi
+fi
+
+if grep -qE '^compose(\..+)?\.yaml$' <<<"$changed"; then
+  printf '\npost-merge : un fichier compose a changé → make app@update\n' >&2
+fi
+
+exit 0
