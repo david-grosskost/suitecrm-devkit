@@ -1,0 +1,5 @@
+# Shared PHPStan settings of the SuiteCRM projects.
+# A project's phpstan.dist.neon includes this file, then sets its paths,
+# its baseline and its tmpDir (relative paths here would point into vendor/).
+parameters:
+    level: 6

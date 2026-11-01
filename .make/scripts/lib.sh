@@ -8,6 +8,13 @@ LOCAL_ENV_FILE=".env.local" # never versioned: environment and secrets
 NETWORK="proxy"
 SCRIPTS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Images of the quality tools: run in Docker, same versions everywhere.
+PHP_IMAGE="php:8.4-cli"
+HADOLINT_IMAGE="hadolint/hadolint:v2.12.0"
+
+# Git Bash would turn the /app of docker commands into a Windows path.
+export MSYS_NO_PATHCONV=1
+
 # Prints an error and exits.
 #
 # @param string $* Message
@@ -33,7 +40,7 @@ run () {
 # Root of the devkit, relative to the project root (the current directory):
 # "." in the devkit itself, vendor/david-grosskost/suitecrm-devkit in a project.
 # Relative on purpose: the project folder can be moved. Both paths come from
-# pwd -P: under Git Bash, $PWD may be F:/… while cd gives /f/….
+# pwd -P: under Git Bash, $PWD may be F:/... while cd gives /f/....
 devkit_dir () {
   local root here
   root="$(cd "$SCRIPTS/../.." && pwd -P)"
@@ -101,6 +108,17 @@ compose () {
   args+=(-f compose.yaml)
   if [ -f "compose.$APP_ENV.yaml" ]; then args+=(-f "compose.$APP_ENV.yaml"); fi
   run docker compose "${args[@]}" "$@"
+}
+
+# Project directory as Docker Desktop understands it: F:/projects/... under Git Bash.
+host_pwd () { pwd -W 2>/dev/null || pwd; }
+
+# Runs a PHP command of the project (vendor/bin/...) in a throwaway container.
+#
+# @param string $@ Command and arguments, e.g. vendor/bin/phpstan analyse
+php_run () {
+  run docker run --rm --user "$(id -u):$(id -g)" \
+    -v "$(host_pwd):/app" -w /app "$PHP_IMAGE" php "$@"
 }
 
 # @return 0 if the reverse proxy's shared network exists
