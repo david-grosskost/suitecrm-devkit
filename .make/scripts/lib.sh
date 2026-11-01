@@ -8,9 +8,12 @@ LOCAL_ENV_FILE=".env.local" # never versioned: environment and secrets
 NETWORK="proxy"
 SCRIPTS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Images of the quality tools: run in Docker, same versions everywhere.
+# Images of the tools: run in Docker, same versions everywhere.
 PHP_IMAGE="php:8.4-cli"
+COMPOSER_IMAGE="composer:2"
 HADOLINT_IMAGE="hadolint/hadolint:v2.12.0"
+PLAYWRIGHT_VERSION="1.61.1"
+PLAYWRIGHT_IMAGE="mcr.microsoft.com/playwright:v$PLAYWRIGHT_VERSION-noble"
 
 # Git Bash would turn the /app of docker commands into a Windows path.
 export MSYS_NO_PATHCONV=1
@@ -119,6 +122,22 @@ host_pwd () { pwd -W 2>/dev/null || pwd; }
 php_run () {
   run docker run --rm --user "$(id -u):$(id -g)" \
     -v "$(host_pwd):/app" -w /app "$PHP_IMAGE" php "$@"
+}
+
+# Runs Composer in a throwaway container: no PHP needed on the machine.
+# COMPOSER_ROOT_VERSION: Composer does not need to ask Git for the project version.
+#
+# @param string $@ Composer command and arguments, e.g. update
+composer_run () {
+  run docker run --rm --user "$(id -u):$(id -g)" -e COMPOSER_ROOT_VERSION=dev-main \
+    -v "$(host_pwd):/app" -w /app "$COMPOSER_IMAGE" "$@"
+}
+
+# IP of the reverse proxy (Traefik) on the shared network, empty if not running.
+traefik_ip () {
+  docker network inspect "$NETWORK" \
+    -f '{{range .Containers}}{{.Name}} {{.IPv4Address}}{{"\n"}}{{end}}' 2>/dev/null \
+    | awk '/traefik/ { sub(/\/.*/, "", $2); print $2; exit }'
 }
 
 # @return 0 if the reverse proxy's shared network exists
