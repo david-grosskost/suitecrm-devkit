@@ -12,6 +12,10 @@
 # /srv/suitecrm/<APP_SLUG>, then runs server.sh there. The passwords are
 # generated on the server at the first deployment and never leave it.
 #
+# Then the smoke test (make test@smoke) checks the instance from outside,
+# through its public URL. If the deployment or the smoke test fails, the
+# previous version is put back (server.sh rollback) and the job fails.
+#
 # Settings of the GitHub environment (production: required reviewer, v* tags):
 #   variables APP_SLUG (instance name, unique on the server) and APP_HOST
 # Settings of the repository:
@@ -105,10 +109,33 @@ jobs:
             "$devkit/deploy/server.sh" "$TARGET:$REMOTE_DIR/"
 
       - name: Deploy ${{ env.APP_VERSION }} to https://${{ vars.APP_HOST }}
+        id: deploy
         run: |
           # shellcheck disable=SC2029 # expanded here on purpose: checked values
           ssh "$TARGET" "APP_ENV='$APP_ENV' APP_SLUG='$APP_SLUG' APP_HOST='$APP_HOST' \
             APP_VERSION='$APP_VERSION' bash '$REMOTE_DIR/server.sh' deploy"
+
+      # Without the admin credentials, which stay on the server: checks that
+      # the instance answers on its public URL and shows its login page.
+      - name: Smoke test
+        id: smoke
+        run: make test@smoke
+
+      - name: Roll back to the previous version
+        if: failure() && (steps.deploy.outcome == 'failure' || steps.smoke.outcome == 'failure')
+        run: |
+          echo "::error::déploiement de $APP_VERSION en échec : retour à la version précédente"
+          # shellcheck disable=SC2029 # expanded here on purpose: checked values
+          ssh "$TARGET" "bash '$REMOTE_DIR/server.sh' rollback '$APP_VERSION'"
+
+      - name: Summary
+        if: always()
+        run: |
+          if [ "${{ job.status }}" = success ]; then
+            echo "✅ $APP_VERSION déployée sur https://$APP_HOST" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "❌ $APP_VERSION non déployée sur https://$APP_HOST : voir les étapes" >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Remove the SSH key
         if: always()
