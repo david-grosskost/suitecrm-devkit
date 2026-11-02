@@ -12,6 +12,9 @@
 #    GHCR, tagged with the version. Done here and not on the tag event: a tag
 #    created with GITHUB_TOKEN does not trigger other workflows.
 #
+# Outputs release_created and version: the project can chain its demo
+# deployment (deploy.yml), which then starts once the image is pushed.
+#
 # Optional secret RELEASE_TOKEN (personal access token): without it,
 # release pull requests are opened with GITHUB_TOKEN and do not trigger the CI.
 name: Release
@@ -30,6 +33,14 @@ on:
     secrets:
       RELEASE_TOKEN:
         required: false
+    # For the jobs that follow in the project, e.g. the demo deployment.
+    outputs:
+      release_created:
+        description: "true when this run created a release (and pushed its image)"
+        value: ${{ jobs.release-please.outputs.release_created }}
+      version:
+        description: Version of the created release, e.g. 0.2.0
+        value: ${{ jobs.release-please.outputs.version }}
 
 jobs:
   release-please:

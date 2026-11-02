@@ -1,0 +1,115 @@
+# Deployment of a SuiteCRM project to a server, called by the project:
+#   jobs:
+#     deploy:
+#       uses: david-grosskost/suitecrm-devkit/.github/workflows/deploy.yml@vX.Y.Z
+#       with:
+#         environment: demo          # GitHub environment: demo or production
+#         version: 0.2.0             # or v0.2.0: image and tag of the release
+#       secrets: inherit
+#
+# Runs over SSH, as the deploy user: copies the compose files, .env and
+# .env.local.example of the release, with deploy/server.sh of the devkit, into
+# /srv/suitecrm/<APP_SLUG>, then runs server.sh there. The passwords are
+# generated on the server at the first deployment and never leave it.
+#
+# Settings of the GitHub environment (production: required reviewer, v* tags):
+#   variables APP_SLUG (instance name, unique on the server) and APP_HOST
+# Settings of the repository:
+#   secret DEPLOY_SSH_KEY, variables DEPLOY_HOST, DEPLOY_USER, DEPLOY_KNOWN_HOSTS
+name: Deploy
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: GitHub environment, demo or production
+        type: string
+        required: true
+      version:
+        description: Version to deploy, with or without its leading v
+        type: string
+        required: true
+    secrets:
+      DEPLOY_SSH_KEY:
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment }}
+      url: https://${{ vars.APP_HOST }}
+    # One deployment at a time per instance; a newer one waits, never cancels.
+    concurrency:
+      group: deploy-${{ github.repository }}-${{ inputs.environment }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    env:
+      ENVIRONMENT: ${{ inputs.environment }}
+      VERSION: ${{ inputs.version }}
+      APP_SLUG: ${{ vars.APP_SLUG }}
+      APP_HOST: ${{ vars.APP_HOST }}
+      DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+    steps:
+      - name: Check the settings
+        run: |
+          failed=0
+          for key in APP_SLUG APP_HOST DEPLOY_HOST DEPLOY_USER; do
+            if [ -z "${!key}" ]; then
+              echo "::error::variable $key manquante (environnement $ENVIRONMENT ou dépôt)"
+              failed=1
+            fi
+          done
+          [[ $APP_SLUG =~ ^[a-z0-9][a-z0-9-]*$ ]] \
+            || { echo "::error::APP_SLUG invalide : $APP_SLUG"; failed=1; }
+          case "$ENVIRONMENT" in
+            demo) app_env=demo ;;
+            production) app_env=prod ;;
+            *) echo "::error::environnement inconnu : $ENVIRONMENT (demo ou production)"; failed=1 ;;
+          esac
+          [ "$failed" = 0 ] || exit 1
+          {
+            echo "APP_ENV=$app_env"
+            echo "APP_VERSION=${VERSION#v}"
+            echo "TARGET=$DEPLOY_USER@$DEPLOY_HOST"
+            echo "REMOTE_DIR=/srv/suitecrm/$APP_SLUG"
+          } >> "$GITHUB_ENV"
+
+      # The files of the release itself, not those of the branch.
+      - uses: actions/checkout@v7
+        with:
+          ref: v${{ env.APP_VERSION }}
+
+      # The devkit version of the project (composer.lock), for deploy/server.sh.
+      - name: Install the devkit
+        run: make
+
+      - name: Configure SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ vars.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          [ -n "$DEPLOY_KNOWN_HOSTS" ] || { echo "::error::variable DEPLOY_KNOWN_HOSTS manquante"; exit 1; }
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ( umask 077 && printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519 )
+
+      - name: Copy the files to ${{ env.REMOTE_DIR }}
+        run: |
+          devkit=vendor/david-grosskost/suitecrm-devkit
+          # shellcheck disable=SC2029 # expanded here on purpose: checked values
+          ssh "$TARGET" "mkdir -p '$REMOTE_DIR'"
+          scp -q compose.yaml "compose.$APP_ENV.yaml" .env .env.local.example \
+            "$devkit/deploy/server.sh" "$TARGET:$REMOTE_DIR/"
+
+      - name: Deploy ${{ env.APP_VERSION }} to https://${{ vars.APP_HOST }}
+        run: |
+          # shellcheck disable=SC2029 # expanded here on purpose: checked values
+          ssh "$TARGET" "APP_ENV='$APP_ENV' APP_SLUG='$APP_SLUG' APP_HOST='$APP_HOST' \
+            APP_VERSION='$APP_VERSION' bash '$REMOTE_DIR/server.sh' deploy"
+
+      - name: Remove the SSH key
+        if: always()
+        run: rm -f ~/.ssh/id_ed25519
