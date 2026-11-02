@@ -134,9 +134,11 @@ composer_run () {
 }
 
 # IP of the reverse proxy (Traefik) on the shared network, empty if not running.
+# No network on this machine (e.g. the CI): empty, never an error, as the
+# callers run with set -e and pipefail.
 traefik_ip () {
-  docker network inspect "$NETWORK" \
-    -f '{{range .Containers}}{{.Name}} {{.IPv4Address}}{{"\n"}}{{end}}' 2>/dev/null \
+  { docker network inspect "$NETWORK" \
+      -f '{{range .Containers}}{{.Name}} {{.IPv4Address}}{{"\n"}}{{end}}' 2>/dev/null || true; } \
     | awk '/traefik/ { sub(/\/.*/, "", $2); print $2; exit }'
 }
 
