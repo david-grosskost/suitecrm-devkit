@@ -9,10 +9,12 @@
 #           every service is healthy, and installs SuiteCRM if not yet done.
 # rollback: runs the previous version again (APP_PREVIOUS_VERSION). The code
 #           only: a database already changed by the new version stays as is.
+#           Given a version, only if it is the one running: a deployment that
+#           failed before switching versions must not go one version back.
 #
 # @usage APP_ENV=demo APP_SLUG=demo-core APP_HOST=demo-core.example.com \
 #          APP_VERSION=0.2.0 bash server.sh deploy
-# @usage bash server.sh rollback
+# @usage bash server.sh rollback [0.2.0]
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -123,6 +125,10 @@ rollback () {
   current="$(env_value "$LOCAL_ENV_FILE" APP_VERSION)"
   previous="$(env_value "$LOCAL_ENV_FILE" APP_PREVIOUS_VERSION)"
   [ -n "$previous" ] || die "aucune version précédente : rien à restaurer"
+  if [ -n "${1:-}" ] && [ "$1" != "$current" ]; then
+    info "Version en place : $current, pas $1 : rien à restaurer."
+    return 0
+  fi
 
   set_env_value "$LOCAL_ENV_FILE" APP_VERSION "$previous"
   set_env_value "$LOCAL_ENV_FILE" APP_PREVIOUS_VERSION "$current"
@@ -132,6 +138,6 @@ rollback () {
 
 case "${1:-}" in
   deploy) deploy ;;
-  rollback) rollback ;;
-  *) die "usage : server.sh deploy|rollback" ;;
+  rollback) rollback "${2:-}" ;;
+  *) die "usage : server.sh deploy|rollback [version]" ;;
 esac
