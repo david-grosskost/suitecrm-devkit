@@ -1,8 +1,9 @@
 # CI of the devkit itself: the same checks as every project.
+# Pull requests only: main only receives merged pull requests whose checks
+# passed, so running them again on each push would be redundant.
 name: CI
 
 on:
-  push:
   pull_request:
 
 jobs:
