@@ -83,6 +83,9 @@ jobs:
           file: ${{ inputs.dockerfile }}
           target: ${{ inputs.target }}
           load: true
+          # A new value on each release: the Dockerfile layer that applies the
+          # Debian security updates is rebuilt, never taken from the cache.
+          build-args: SECURITY_REFRESH=${{ github.run_id }}
           # Layers cached between releases (GitHub Actions cache): only the
           # steps after a change are rebuilt, not the PHP extensions each time.
           cache-from: type=gha
