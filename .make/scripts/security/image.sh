@@ -14,10 +14,19 @@
 set -euo pipefail
 . "$(dirname "$0")/../lib.sh"
 
+# Image of the app service, read in the resolved compose configuration
+# (config --images lists every service, in no useful order).
+compose_app_image () {
+  docker compose --env-file "$ENV_FILE" -f compose.yaml config 2>/dev/null | awk '
+    /^  app:$/ { app = 1; next }
+    app && /^  [^ ]/ { exit }
+    app && /^    image: / { print $2; exit }'
+}
+
 image="${IMAGE:-}"
 if [ -z "$image" ]; then
-  image="$(docker compose --env-file "$ENV_FILE" -f compose.yaml config --images app 2>/dev/null | head -n 1)"
-  [ -n "$image" ] || die "security@image : IMAGE manquant, et pas d'image app dans compose.yaml"
+  image="$(compose_app_image)"
+  [ -n "$image" ] || die "security@image : IMAGE manquant, et pas d'image pour le service app de compose.yaml"
 fi
 docker image inspect "$image" >/dev/null 2>&1 \
   || die "security@image : image $image absente de cette machine (make app@update la construit)"
@@ -28,7 +37,7 @@ trivy () {
   run docker run --rm \
     -v /var/run/docker.sock:/var/run/docker.sock \
     -v trivy-cache:/root/.cache/trivy \
-    "$TRIVY_IMAGE" image --no-progress --ignore-unfixed "$@" "$image"
+    "$TRIVY_IMAGE" image --no-progress --skip-version-check --ignore-unfixed "$@" "$image"
 }
 
 info "Bibliothèques de l'application (pour information) :"
