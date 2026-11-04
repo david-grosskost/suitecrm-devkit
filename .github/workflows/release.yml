@@ -8,8 +8,9 @@
 # 1. release-please keeps a "release" pull request up to date: next version,
 #    computed from the Conventional Commits, and CHANGELOG.md. Merging it
 #    creates the tag and the GitHub release.
-# 2. When a release has just been created, the image is built and pushed to
-#    GHCR, tagged with the version. Done here and not on the tag event: a tag
+# 2. When a release has just been created, the image is built, scanned for
+#    known vulnerabilities (make security@image), then pushed to GHCR, tagged
+#    with the version. Done here and not on the tag event: a tag
 #    created with GITHUB_TOKEN does not trigger other workflows.
 #
 # Outputs release_created and version: the project can chain its demo
@@ -74,13 +75,17 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ github.token }}
 
-      - name: Build and push ghcr.io/${{ github.repository }}:${{ needs.release-please.outputs.version }}
+      # Built into the local Docker first: scanned before anything is published.
+      - name: Build ghcr.io/${{ github.repository }}:${{ needs.release-please.outputs.version }}
         uses: docker/build-push-action@v7
         with:
           context: .
           file: ${{ inputs.dockerfile }}
           target: ${{ inputs.target }}
-          push: true
+          load: true
+          # A new value on each release: the Dockerfile layer that applies the
+          # Debian security updates is rebuilt, never taken from the cache.
+          build-args: SECURITY_REFRESH=${{ github.run_id }}
           # Layers cached between releases (GitHub Actions cache): only the
           # steps after a change are rebuilt, not the PHP extensions each time.
           cache-from: type=gha
@@ -90,3 +95,14 @@ jobs:
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.version=${{ needs.release-please.outputs.version }}
             org.opencontainers.image.revision=${{ github.sha }}
+
+      - name: Install the devkit
+        run: make
+
+      # Fails on a critical, fixable vulnerability of the system packages:
+      # the image is then not published, and the demo not deployed.
+      - name: Scan the image (Trivy)
+        run: make security@image IMAGE="ghcr.io/${{ github.repository }}:${{ needs.release-please.outputs.version }}"
+
+      - name: Push the image
+        run: docker push "ghcr.io/${{ github.repository }}:${{ needs.release-please.outputs.version }}"

@@ -14,6 +14,10 @@ COMPOSER_IMAGE="composer:2"
 HADOLINT_IMAGE="hadolint/hadolint:v2.12.0"
 PLAYWRIGHT_VERSION="1.61.1"
 PLAYWRIGHT_IMAGE="mcr.microsoft.com/playwright:v$PLAYWRIGHT_VERSION-noble"
+# Image scanner (make security@image). Pinned: never a floating tag, as the
+# Trivy release channels were briefly compromised in March 2026.
+# Pinned by digest too: a tag can be moved, a digest cannot.
+TRIVY_IMAGE="aquasec/trivy:0.72.0@sha256:cffe3f5161a47a6823fbd23d985795b3ed72a4c806da4c4df16266c02accdd6f"
 
 # Git Bash would turn the /app of docker commands into a Windows path.
 export MSYS_NO_PATHCONV=1
