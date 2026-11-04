@@ -12,6 +12,10 @@
 # /srv/suitecrm/<APP_SLUG>, then runs server.sh there. The passwords are
 # generated on the server at the first deployment and never leave it.
 #
+# Just before switching versions, the whole server is backed up (server
+# repository, /srv/server): if the new version damages the data,
+# make backup@restore puts the instance back as it was. No backup, no deployment.
+#
 # Then the smoke test (make test@smoke) checks the instance from outside,
 # through its public URL. If the deployment or the smoke test fails, the
 # previous version is put back (server.sh rollback) and the job fails.
@@ -108,6 +112,19 @@ jobs:
           scp -q compose.yaml "compose.$APP_ENV.yaml" .env .env.local.example \
             "$devkit/deploy/server.sh" "$TARGET:$REMOTE_DIR/"
 
+      # Skipped with a warning on a server without the server repository.
+      - name: Back up the server before deploying
+        run: |
+          log="$(mktemp)"
+          # shellcheck disable=SC2016 # expanded on the server, on purpose
+          ssh "$TARGET" 'if [ -f /srv/server/Makefile ]; then
+              make -C /srv/server backup@run BACKUP_TAG=pre-deploy BACKUP_MAINTENANCE=0
+            else
+              echo "::warning::pas de /srv/server sur le serveur : déploiement sans sauvegarde préalable"
+            fi' 2>&1 | tee "$log"
+          snapshot="$(sed -n 's/^snapshot \([0-9a-f]*\) saved$/\1/p' "$log" | tail -n 1)"
+          echo "BACKUP_SNAPSHOT=$snapshot" >> "$GITHUB_ENV"
+
       - name: Deploy ${{ env.APP_VERSION }} to https://${{ vars.APP_HOST }}
         id: deploy
         run: |
@@ -135,6 +152,13 @@ jobs:
             echo "✅ $APP_VERSION déployée sur https://$APP_HOST" >> "$GITHUB_STEP_SUMMARY"
           else
             echo "❌ $APP_VERSION non déployée sur https://$APP_HOST : voir les étapes" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -n "${BACKUP_SNAPSHOT:-}" ]; then
+            {
+              echo ""
+              echo "Sauvegarde d'avant déploiement : \`$BACKUP_SNAPSHOT\`. Pour y revenir, sur le serveur :"
+              echo "\`cd /srv/server && make backup@restore INSTANCE=$APP_SLUG SNAPSHOT=$BACKUP_SNAPSHOT\`"
+            } >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Remove the SSH key
