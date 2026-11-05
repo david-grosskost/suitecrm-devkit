@@ -23,12 +23,13 @@ if [ ! -f "$LOCAL_ENV_FILE" ]; then
     set_env_value "$LOCAL_ENV_FILE" "$key" "${!key}"
   done < .env.local.example
 
-  # Passwords not given as parameters are generated.
-  for key in DB_PASSWORD DB_ROOT_PASSWORD ADMIN_PASSWORD; do
-    if grep -q "^$key=change-me" "$LOCAL_ENV_FILE"; then
+  # Passwords not given as parameters are generated: every key whose value
+  # is change-me in .env.local.example.
+  while IFS='=' read -r key _; do
+    if [[ $key =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] && grep -q "^$key=change-me\$" "$LOCAL_ENV_FILE"; then
       set_env_value "$LOCAL_ENV_FILE" "$key" "$(secret)"
     fi
-  done
+  done < .env.local.example
 
   info "$LOCAL_ENV_FILE créé avec APP_ENV=$APP_ENV : les prochaines commandes l'utiliseront."
   read_env_file "$LOCAL_ENV_FILE"
