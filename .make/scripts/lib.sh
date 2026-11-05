@@ -19,7 +19,7 @@ PLAYWRIGHT_IMAGE="mcr.microsoft.com/playwright:v$PLAYWRIGHT_VERSION-noble"
 # Pinned by digest too: a tag can be moved, a digest cannot.
 TRIVY_IMAGE="aquasec/trivy:0.72.0@sha256:cffe3f5161a47a6823fbd23d985795b3ed72a4c806da4c4df16266c02accdd6f"
 # Passive scanner of a running instance (make security@zap). Pinned version.
-ZAP_IMAGE="zaproxy/zap-stable:2.17.0"
+ZAP_IMAGE="zaproxy/zap-stable:2.17.0@sha256:9624669db72f54d86c4b46a7064518bd9bf79d8c61a4c31befa9923489f328af"
 
 # Git Bash would turn the /app of docker commands into a Windows path.
 export MSYS_NO_PATHCONV=1
