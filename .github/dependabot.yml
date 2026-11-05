@@ -1,0 +1,27 @@
+# Opens a pull request when a newer version of a dependency is released, every
+# week. Prefixes follow Conventional Commits (the pull request title becomes
+# the commit on main). The images pinned in the scripts (hadolint, Trivy, ZAP,
+# composer, php) are not seen by Dependabot: they are updated by hand.
+version: 2
+updates:
+  - package-ecosystem: composer
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: build
+      include: scope
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+    commit-message:
+      prefix: ci
+      include: scope
