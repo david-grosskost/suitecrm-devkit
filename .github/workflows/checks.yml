@@ -55,6 +55,22 @@ jobs:
           done
           exit "$failed"
 
+      - name: Check the pull request title
+        # Squash merge: the title becomes the commit message on main, the one
+        # release-please reads. Checked like a commit message.
+        if: github.event_name == 'pull_request'
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          devkit=vendor/david-grosskost/suitecrm-devkit
+          [ -d "$devkit" ] || devkit=.
+          msg="$(mktemp)"
+          printf '%s\n' "$PR_TITLE" > "$msg"
+          if ! "$devkit/.githooks/commit-msg" "$msg"; then
+            echo "::error::titre de la pull request non conforme : il devient le message du commit sur main"
+            exit 1
+          fi
+
   # Pre-commit checks on every tracked file (scripts, secrets, sensitive files,
   # shellcheck), then the quality checks: hadolint, PHP-CS-Fixer, PHPStan,
   # and the known vulnerabilities of the PHP dependencies.

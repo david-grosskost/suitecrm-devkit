@@ -5,6 +5,8 @@ name: CI
 
 on:
   pull_request:
+    # edited: a corrected pull request title is checked again.
+    types: [opened, synchronize, reopened, edited]
 
 jobs:
   checks:
