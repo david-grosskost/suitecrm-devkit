@@ -110,15 +110,9 @@ jobs:
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
           ( umask 077 && printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519 )
 
-      - name: Copy the files to ${{ env.REMOTE_DIR }}
-        run: |
-          devkit=vendor/david-grosskost/suitecrm-devkit
-          # shellcheck disable=SC2029 # expanded here on purpose: checked values
-          ssh "$TARGET" "mkdir -p '$REMOTE_DIR'"
-          scp -q compose.yaml "compose.$APP_ENV.yaml" .env .env.local.example \
-            "$devkit/deploy/server.sh" "$TARGET:$REMOTE_DIR/"
-
-      # Skipped with a warning on a server without the server repository.
+      # Before copying the files: the backup must hold the compose files of
+      # the version in service, those a restore starts again. Skipped with a
+      # warning on a server without the server repository.
       - name: Back up the server before deploying
         run: |
           log="$(mktemp)"
@@ -130,6 +124,14 @@ jobs:
             fi' 2>&1 | tee "$log"
           snapshot="$(sed -n 's/^snapshot \([0-9a-f]*\) saved$/\1/p' "$log" | tail -n 1)"
           echo "BACKUP_SNAPSHOT=$snapshot" >> "$GITHUB_ENV"
+
+      - name: Copy the files to ${{ env.REMOTE_DIR }}
+        run: |
+          devkit=vendor/david-grosskost/suitecrm-devkit
+          # shellcheck disable=SC2029 # expanded here on purpose: checked values
+          ssh "$TARGET" "mkdir -p '$REMOTE_DIR'"
+          scp -q compose.yaml "compose.$APP_ENV.yaml" .env .env.local.example \
+            "$devkit/deploy/server.sh" "$TARGET:$REMOTE_DIR/"
 
       - name: Deploy ${{ env.APP_VERSION }} to https://${{ vars.APP_HOST }}
         id: deploy
