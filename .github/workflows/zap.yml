@@ -1,0 +1,51 @@
+# Passive security scan of a running instance (OWASP ZAP baseline), called by
+# a project's scheduled workflow:
+#   on:
+#     schedule:
+#       - cron: '23 5 * * 1'
+#     workflow_dispatch:
+#   jobs:
+#     zap:
+#       uses: david-grosskost/suitecrm-devkit/.github/workflows/zap.yml@vX.Y.Z
+#       with:
+#         url: https://demo.example.com
+#
+# Runs make security@zap: fails on a high-risk alert (GitHub then sends an
+# e-mail), lists the others. Alerts accepted on purpose: the project's
+# .zap/rules.tsv. The report is kept 30 days with the run (zap-report).
+name: ZAP
+
+on:
+  workflow_call:
+    inputs:
+      url:
+        description: Public URL of the instance to scan
+        type: string
+        required: true
+
+jobs:
+  zap:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install the devkit
+        run: make
+
+      - name: Passive scan of ${{ inputs.url }}
+        env:
+          URL: ${{ inputs.url }}
+        run: make security@zap URL="$URL"
+
+      - name: Keep the report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: zap-report
+          path: .tools/zap/zap-report.*
+          # .tools/ is hidden: its files are left out unless asked for.
+          include-hidden-files: true
+          retention-days: 30
+          if-no-files-found: ignore

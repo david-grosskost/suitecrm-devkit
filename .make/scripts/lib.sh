@@ -18,6 +18,8 @@ PLAYWRIGHT_IMAGE="mcr.microsoft.com/playwright:v$PLAYWRIGHT_VERSION-noble"
 # Trivy release channels were briefly compromised in March 2026.
 # Pinned by digest too: a tag can be moved, a digest cannot.
 TRIVY_IMAGE="aquasec/trivy:0.72.0@sha256:cffe3f5161a47a6823fbd23d985795b3ed72a4c806da4c4df16266c02accdd6f"
+# Passive scanner of a running instance (make security@zap). Pinned version.
+ZAP_IMAGE="zaproxy/zap-stable:2.17.0"
 
 # Git Bash would turn the /app of docker commands into a Windows path.
 export MSYS_NO_PATHCONV=1
