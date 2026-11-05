@@ -1,0 +1,149 @@
+# Loads the demo data into a deployed demo, on demand: never automatic, the
+# person who launches it chooses the seeders and the volume. Called by the
+# project (and later by the demo-manager, through the GitHub API):
+#   jobs:
+#     seed:
+#       uses: david-grosskost/suitecrm-devkit/.github/workflows/seed.yml@vX.Y.Z
+#       with:
+#         environment: demo
+#         seeders: core/accounts core/contacts   # empty: all of them
+#         count: 200                             # generated accounts, 0 to 1500
+#       secrets: inherit
+#
+# Runs over SSH, as the deploy user: backs up the server first (tag pre-seed,
+# server repository), then runs deploy/server.sh seed in the instance
+# directory, which the last deployment filled. Safe to run again: records are
+# updated, never duplicated. A demo only: refused for production, here and on
+# the server.
+#
+# Same settings as deploy.yml (GitHub environment and repository).
+name: Seed
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: GitHub environment, demo only
+        type: string
+        required: true
+      seeders:
+        description: Seeders separated by spaces (with those they depend on), empty for all
+        type: string
+        default: ""
+      count:
+        description: Generated accounts (seeder core/volume), 0 to 1500
+        type: number
+        default: 0
+    secrets:
+      DEPLOY_SSH_KEY:
+        required: true
+
+# bash with pipefail (GitHub's default shell has none): a failing command
+# piped into tee (backup, seed) fails its step.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment }}
+      url: https://${{ vars.APP_HOST }}
+    # Never during a deployment of the same instance: they share the group.
+    concurrency:
+      group: deploy-${{ github.repository }}-${{ inputs.environment }}
+      cancel-in-progress: false
+    permissions: {}
+    env:
+      ENVIRONMENT: ${{ inputs.environment }}
+      SEEDERS: ${{ inputs.seeders }}
+      COUNT: ${{ inputs.count }}
+      APP_SLUG: ${{ vars.APP_SLUG }}
+      APP_HOST: ${{ vars.APP_HOST }}
+      DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+    steps:
+      - name: Check the settings
+        run: |
+          failed=0
+          [ "$ENVIRONMENT" = demo ] \
+            || { echo "::error::données de démo : environnement demo uniquement (reçu « $ENVIRONMENT »)"; failed=1; }
+          for key in APP_SLUG APP_HOST DEPLOY_HOST DEPLOY_USER; do
+            if [ -z "${!key}" ]; then
+              echo "::error::variable $key manquante (environnement $ENVIRONMENT ou dépôt)"
+              failed=1
+            fi
+          done
+          [[ $APP_SLUG =~ ^[a-z0-9][a-z0-9-]*$ ]] \
+            || { echo "::error::APP_SLUG invalide : $APP_SLUG"; failed=1; }
+          # Checked here because they are passed to the server's shell.
+          [[ $SEEDERS =~ ^[[:space:]]*([a-z0-9-]+/[a-z0-9-]+[[:space:]]*)*$ ]] \
+            || { echo "::error::seeders invalides : « $SEEDERS » (ex. core/accounts core/contacts)"; failed=1; }
+          [[ $COUNT =~ ^[0-9]+$ ]] && [ "$COUNT" -le 1500 ] \
+            || { echo "::error::count doit être un nombre de 0 à 1500 (reçu « $COUNT »)"; failed=1; }
+          [ "$failed" = 0 ] || exit 1
+          {
+            echo "TARGET=$DEPLOY_USER@$DEPLOY_HOST"
+            echo "REMOTE_DIR=/srv/suitecrm/$APP_SLUG"
+          } >> "$GITHUB_ENV"
+
+      - name: Configure SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ vars.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          [ -n "$DEPLOY_KNOWN_HOSTS" ] || { echo "::error::variable DEPLOY_KNOWN_HOSTS manquante"; exit 1; }
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ( umask 077 && printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_ed25519 )
+
+      # Skipped with a warning on a server without the server repository.
+      - name: Back up the server before seeding
+        run: |
+          log="$(mktemp)"
+          # shellcheck disable=SC2016 # expanded on the server, on purpose
+          ssh "$TARGET" 'if [ -f /srv/server/Makefile ]; then
+              make -C /srv/server backup@run BACKUP_TAG=pre-seed BACKUP_MAINTENANCE=0
+            else
+              echo "::warning::pas de /srv/server sur le serveur : seed sans sauvegarde préalable"
+            fi' 2>&1 | tee "$log"
+          snapshot="$(sed -n 's/^snapshot \([0-9a-f]*\) saved$/\1/p' "$log" | tail -n 1)"
+          echo "BACKUP_SNAPSHOT=$snapshot" >> "$GITHUB_ENV"
+
+      - name: Seed https://${{ vars.APP_HOST }}
+        run: |
+          log="$(mktemp)"
+          # SEEDERS: names checked above, split into arguments on purpose.
+          # shellcheck disable=SC2029,SC2086 # expanded here on purpose: checked values
+          ssh "$TARGET" "SEED_COUNT='$COUNT' bash '$REMOTE_DIR/server.sh' seed $SEEDERS" 2>&1 | tee "$log"
+          # The counts printed by the seeders, for the summary.
+          grep -E '^  (core|[a-z0-9-]+)/|Données de démo' "$log" > "$RUNNER_TEMP/seed-counts" || true
+
+      - name: Summary
+        if: always()
+        run: |
+          if [ "${{ job.status }}" = success ]; then
+            {
+              echo "✅ Données de démo chargées sur https://$APP_HOST"
+              echo ""
+              echo "Seeders : \`${SEEDERS:-tous}\`, comptes générés : $COUNT"
+              echo ""
+              echo '```'
+              cat "$RUNNER_TEMP/seed-counts" 2>/dev/null || true
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "❌ Données de démo non chargées sur https://$APP_HOST : voir les étapes" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -n "${BACKUP_SNAPSHOT:-}" ]; then
+            {
+              echo ""
+              echo "Sauvegarde d'avant seed : \`$BACKUP_SNAPSHOT\`. Pour y revenir, sur le serveur :"
+              echo "\`cd /srv/server && make backup@restore INSTANCE=$APP_SLUG SNAPSHOT=$BACKUP_SNAPSHOT\`"
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Remove the SSH key
+        if: always()
+        run: rm -f ~/.ssh/id_ed25519

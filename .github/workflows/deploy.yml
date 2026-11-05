@@ -41,6 +41,12 @@ on:
       DEPLOY_SSH_KEY:
         required: true
 
+# bash with pipefail (GitHub's default shell has none): a failing command
+# piped into tee (backup, seed) fails its step.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   deploy:
     runs-on: ubuntu-latest

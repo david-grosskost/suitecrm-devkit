@@ -12,13 +12,23 @@
 #           Given a version, only if it is the one running: a deployment that
 #           failed before switching versions must not go one version back.
 #
+# seed:     loads the demo data into a running demo (database/seeders of the
+#           image): the given seeders and those they depend on, all of them
+#           by default, plus SEED_COUNT generated accounts. Safe to run again:
+#           records are updated, never duplicated. Refused outside a demo.
+#
 # @usage APP_ENV=demo APP_SLUG=demo-core APP_HOST=demo-core.example.com \
 #          APP_VERSION=0.2.0 bash server.sh deploy
 # @usage bash server.sh rollback [0.2.0]
+# @usage SEED_COUNT=200 bash server.sh seed [core/accounts core/volume …]
 set -euo pipefail
 cd "$(dirname "$0")"
 
 LOCAL_ENV_FILE=".env.local"
+# Seed runner of the image (suitecrm-core, and the projects built from it).
+SEED_SCRIPT="/usr/local/share/suitecrm/database/seeders/seed.php"
+# Generated accounts at most (seeder core/volume).
+SEED_MAX_COUNT=1500
 
 # Prints an error and exits.
 #
@@ -151,8 +161,30 @@ rollback () {
   start
 }
 
+seed () {
+  local seeder count="${SEED_COUNT:-0}"
+  [ -f "$LOCAL_ENV_FILE" ] || die "$LOCAL_ENV_FILE absent : instance jamais déployée"
+  read_env_file .env
+  read_env_file "$LOCAL_ENV_FILE"
+  # Demo data has nothing to do in prod, nor anywhere but a demo.
+  [ "${APP_ENV:-}" = demo ] || die "seed : réservé aux démos (APP_ENV=${APP_ENV:-vide})"
+
+  [[ $count =~ ^[0-9]+$ ]] && [ "$count" -le "$SEED_MAX_COUNT" ] \
+    || die "seed : SEED_COUNT doit être un nombre de 0 à $SEED_MAX_COUNT (reçu « $count »)"
+  for seeder in "$@"; do
+    [[ $seeder =~ ^[a-z0-9-]+/[a-z0-9-]+$ ]] \
+      || die "seed : nom de seeder invalide « $seeder » (attendu : paquet/données, ex. core/accounts)"
+  done
+  [ "$(docker inspect -f '{{.State.Running}}' "$APP_SLUG-app" 2>/dev/null)" = true ] \
+    || die "seed : conteneur $APP_SLUG-app arrêté ou absent"
+
+  info "Seed de $APP_SLUG : ${*:-tous les seeders}, $count compte(s) généré(s)"
+  docker exec -u www-data -e SEED_COUNT="$count" "$APP_SLUG-app" php "$SEED_SCRIPT" "$@"
+}
+
 case "${1:-}" in
   deploy) deploy ;;
   rollback) rollback "${2:-}" ;;
-  *) die "usage : server.sh deploy|rollback [version]" ;;
+  seed) shift; seed "$@" ;;
+  *) die "usage : server.sh deploy|rollback [version]|seed [seeder …]" ;;
 esac
