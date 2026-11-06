@@ -146,6 +146,25 @@ jobs:
         id: smoke
         run: make test@smoke
 
+      # The inbox of a demo holds every email it sent: never open without its
+      # password (MAILPIT_PASSWORD, compose.demo.yaml). No rollback on failure:
+      # the previous version runs with the same Mailpit settings.
+      - name: Check that the demo inbox asks for a password
+        if: inputs.environment == 'demo'
+        run: |
+          failed=0
+          for path in / /api/v1/info; do
+            url="https://mail-$APP_HOST$path"
+            code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$url" || true)"
+            if [ "$code" = 401 ]; then
+              echo "$url : 401, mot de passe demandé"
+            else
+              echo "::error::$url répond $code sans mot de passe (attendu : 401, Mailpit doit être protégé)"
+              failed=1
+            fi
+          done
+          exit "$failed"
+
       - name: Roll back to the previous version
         if: failure() && (steps.deploy.outcome == 'failure' || steps.smoke.outcome == 'failure')
         run: |
