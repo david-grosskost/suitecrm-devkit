@@ -1,0 +1,131 @@
+<?php
+
+// Signatures of the SuiteCRM classes, for PHPStan only: SuiteCRM exists only
+// inside the image, so the analysis of a project or an extension cannot read
+// it. A project's phpstan.dist.neon lists this file in scanFiles. Declare here
+// only what the code calls, with the real signatures of SuiteCRM.
+
+class SugarBean
+{
+    /** @var string|null */
+    public $id;
+
+    /** @var bool */
+    public $new_with_id = false;
+
+    public function save(bool $check_notify = false): string
+    {
+    }
+}
+
+class Person extends SugarBean
+{
+}
+
+class User extends Person
+{
+    /**
+     * @param mixed $value
+     */
+    public function setPreference(string $name, $value, int $nosession = 0, string $category = 'global'): void
+    {
+    }
+
+    public function savePreferencesToDB(): void
+    {
+    }
+}
+
+class Administration extends SugarBean
+{
+    /**
+     * @param mixed $value
+     */
+    public function saveSetting(string $category, string $key, $value): int
+    {
+    }
+}
+
+class OutboundEmail
+{
+    /** @var string */
+    public $mail_sendtype;
+
+    /** @var string */
+    public $mail_smtptype;
+
+    /** @var string */
+    public $mail_smtpserver;
+
+    /** @var int */
+    public $mail_smtpport = 25;
+
+    /** @var string */
+    public $mail_smtpuser;
+
+    /** @var string */
+    public $mail_smtppass;
+
+    /** @var int */
+    public $mail_smtpauth_req;
+
+    /** @var int */
+    public $mail_smtpssl;
+
+    /** @var string */
+    public $smtp_from_name;
+
+    /** @var string */
+    public $smtp_from_addr;
+
+    public function getSystemMailerSettings(): self
+    {
+    }
+
+    public function save(): self
+    {
+    }
+
+}
+
+abstract class DBManager
+{
+    /**
+     * @return mixed
+     */
+    public function query(string $sql, bool $dieOnError = false, string $msg = '', bool $suppress = false, bool $keepResult = false)
+    {
+    }
+
+    public function quoted(string $string): string
+    {
+    }
+
+    /**
+     * @param mixed $result
+     */
+    public function getAffectedRowCount($result): int
+    {
+    }
+}
+
+class DBManagerFactory
+{
+    public static function getInstance(string $instanceName = ''): DBManager
+    {
+    }
+}
+
+class BeanFactory
+{
+    /**
+     * @param array<string, mixed> $params
+     */
+    public static function getBean(string $module, ?string $id = null, array $params = [], bool $deleted = true): SugarBean|false
+    {
+    }
+
+    public static function newBean(string $module): SugarBean|false|null
+    {
+    }
+}
