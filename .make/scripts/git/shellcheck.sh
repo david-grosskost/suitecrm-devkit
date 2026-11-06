@@ -47,7 +47,11 @@ if [ -x "$BIN_DIR/$exe" ] \
   exit 0
 fi
 
-tmp="$(mktemp -d)"
+# Inside the project, as a relative path: under Git Bash, a native curl.exe
+# cannot write to /tmp/... (MSYS_NO_PATHCONV, set by lib.sh, keeps the path
+# as is). .tools/ is ignored by Git.
+mkdir -p .tools
+tmp="$(mktemp -d .tools/download.XXXXXX)"
 trap 'rm -rf "$tmp"' EXIT
 
 run curl -sSfL -o "$tmp/$asset" "$RELEASES/v$SHELLCHECK_VERSION/$asset"
