@@ -73,7 +73,8 @@ jobs:
 
   # Pre-commit checks on every tracked file (scripts, secrets, sensitive files,
   # shellcheck), then the quality checks: hadolint, PHP-CS-Fixer, PHPStan,
-  # and the known vulnerabilities of the PHP dependencies.
+  # the extension format and the unit tests (when the project has them), and
+  # the known vulnerabilities of the PHP dependencies.
   quality:
     runs-on: ubuntu-latest
     steps:
@@ -95,6 +96,14 @@ jobs:
 
       - name: Static analysis (PHPStan)
         run: make quality@stan
+
+      # Projects with an extension.json: the format of the SuiteCRM extensions.
+      - name: Extension format (manifest, composer.json, files)
+        run: make extension@validate
+
+      # Projects with a phpunit.xml.dist.
+      - name: Unit tests (PHPUnit)
+        run: make test@unit
 
       - name: Known vulnerabilities of the dependencies (composer audit)
         run: make security@deps

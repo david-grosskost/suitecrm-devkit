@@ -5,6 +5,7 @@
     "license": "proprietary",
     "require": {
         "friendsofphp/php-cs-fixer": "^3.64",
-        "phpstan/phpstan": "^2.1"
+        "phpstan/phpstan": "^2.1",
+        "phpunit/phpunit": "^13.4"
     }
 }
