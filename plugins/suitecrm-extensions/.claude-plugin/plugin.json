@@ -1,0 +1,10 @@
+{
+    "name": "suitecrm-extensions",
+    "version": "0.1.0",
+    "description": "Créer et faire évoluer les extensions SuiteCRM 8 des projets de David Grosskost, même sans connaissance technique : entretien sur le besoin, fabrication depuis le modèle, vérifications, pull request.",
+    "author": {
+        "name": "David Grosskost"
+    },
+    "repository": "https://github.com/david-grosskost/suitecrm-devkit",
+    "keywords": ["suitecrm", "extension", "crm"]
+}
