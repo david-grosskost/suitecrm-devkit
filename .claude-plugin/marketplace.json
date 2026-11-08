@@ -1,0 +1,14 @@
+{
+    "name": "suitecrm-devkit",
+    "owner": {
+        "name": "David Grosskost"
+    },
+    "description": "Plugins Claude des projets SuiteCRM de David Grosskost.",
+    "plugins": [
+        {
+            "name": "suitecrm-extensions",
+            "source": "./plugins/suitecrm-extensions",
+            "description": "Créer et faire évoluer les extensions SuiteCRM 8, même sans connaissance technique."
+        }
+    ]
+}
