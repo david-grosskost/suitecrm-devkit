@@ -6,7 +6,9 @@
 #
 # deploy:   first time, creates .env.local; at each deployment, generates the
 #           passwords it lacks (kept on the server only); then runs the image of APP_VERSION, waits until
-#           every service is healthy, and installs SuiteCRM if not yet done.
+#           every service is healthy, and installs SuiteCRM if not yet done;
+#           once the administrator has replaced a single-use password
+#           (ADMIN_PASSWORD_ONCE), forgets it in .env.local.
 # rollback: runs the previous version again (APP_PREVIOUS_VERSION). The code
 #           only: a database already changed by the new version stays as is.
 #           Given a version, only if it is the one running: a deployment that
@@ -29,6 +31,9 @@ LOCAL_ENV_FILE=".env.local"
 SEED_SCRIPT="/usr/local/share/suitecrm/database/seeders/seed.php"
 # Generated accounts at most (seeder core/volume).
 SEED_MAX_COUNT=1500
+# Written in place of a single-use admin password, once replaced: neither
+# empty nor change-me, so never generated again.
+ADMIN_PASSWORD_REPLACED="replaced-at-first-login"
 
 # Prints an error and exits.
 #
@@ -140,7 +145,27 @@ deploy () {
     -e DB_NAME -e DB_USER -e DB_PASSWORD -e APP_HOST -e ADMIN_USER -e ADMIN_PASSWORD \
     "$APP_SLUG-app" suitecrm-install
 
+  forget_admin_password
   info "Déployé : https://$APP_HOST ($APP_VERSION)"
+}
+
+# With ADMIN_PASSWORD_ONCE (suitecrm-core: demo and prod), the admin password
+# of .env.local opens one session only, then SuiteCRM asks for a new one: once
+# done (the admin no longer has a system generated password), the old one is
+# worthless and misleading, so it is replaced by $ADMIN_PASSWORD_REPLACED. Until
+# then it stays: it is the only way to read the first password. Only at a
+# deployment: a few days of delay at most.
+forget_admin_password () {
+  local generated
+  [ "$(env_value "$LOCAL_ENV_FILE" ADMIN_PASSWORD)" != "$ADMIN_PASSWORD_REPLACED" ] || return 0
+  [ "$(docker exec "$APP_SLUG-app" printenv ADMIN_PASSWORD_ONCE 2>/dev/null)" = 1 ] || return 0
+  # Credentials read inside the database container: nothing is printed.
+  generated="$(docker exec "$APP_SLUG-db" sh -c 'MYSQL_PWD="$MARIADB_PASSWORD" mariadb -N -u"$MARIADB_USER" "$MARIADB_DATABASE" -e "SELECT system_generated_password FROM users WHERE id = '\''1'\''"')" \
+    || { info "ADMIN_PASSWORD : état de l'administrateur illisible, gardé."; return 0; }
+  if [ "$generated" = 0 ]; then
+    set_env_value "$LOCAL_ENV_FILE" ADMIN_PASSWORD "$ADMIN_PASSWORD_REPLACED"
+    info "ADMIN_PASSWORD retiré de $LOCAL_ENV_FILE : l'administrateur a choisi le sien."
+  fi
 }
 
 rollback () {
