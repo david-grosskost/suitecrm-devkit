@@ -17,7 +17,7 @@ PLAYWRIGHT_IMAGE="mcr.microsoft.com/playwright:v$PLAYWRIGHT_VERSION-noble"
 # Image scanner (make security@image). Pinned: never a floating tag, as the
 # Trivy release channels were briefly compromised in March 2026.
 # Pinned by digest too: a tag can be moved, a digest cannot.
-TRIVY_IMAGE="aquasec/trivy:0.72.0@sha256:cffe3f5161a47a6823fbd23d985795b3ed72a4c806da4c4df16266c02accdd6f"
+TRIVY_IMAGE="aquasec/trivy:0.76.2@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb"
 # Passive scanner of a running instance (make security@zap). Pinned version.
 ZAP_IMAGE="zaproxy/zap-stable:2.17.0@sha256:9624669db72f54d86c4b46a7064518bd9bf79d8c61a4c31befa9923489f328af"
 
