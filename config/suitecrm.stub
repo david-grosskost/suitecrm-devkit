@@ -16,6 +16,10 @@ class SugarBean
     public function save(bool $check_notify = false): string
     {
     }
+
+    public function mark_deleted(string $id): void
+    {
+    }
 }
 
 class Person extends SugarBean
@@ -38,6 +42,18 @@ class User extends Person
 
 class Administration extends SugarBean
 {
+    /** @var array<string, mixed> Read by retrieveSettings(), keyed "<category>_<name>" */
+    public $settings = [];
+
+    /**
+     * @param string|false $category
+     *
+     * @return $this|null
+     */
+    public function retrieveSettings($category = false, bool $clean = false)
+    {
+    }
+
     /**
      * @param mixed $value
      */
@@ -98,6 +114,18 @@ abstract class DBManager
     }
 
     public function quoted(string $string): string
+    {
+    }
+
+    /**
+     * Next row of a result of query(), false after the last one. $encode:
+     * values HTML-encoded for display (true) or as stored (false).
+     *
+     * @param mixed $result
+     *
+     * @return array<string, string|null>|false
+     */
+    public function fetchByAssoc($result, bool $encode = true): array|false
     {
     }
 
