@@ -34,8 +34,9 @@ Pose les questions une par une, en mots simples, et reformule à la fin :
 | réagit à un événement (enregistrement, connexion, chaque requête) | `logic-hook` | **validé** (upstream-fixes) |
 | ajoute des champs à un module existant (et leur panneau sur la fiche) | `fields` | **validé** (french-company-fields) |
 | contrôle une saisie sur la fiche (message sous le champ, enregistrement refusé) | `logic-hook` + `fields` | **validé** (french-company-validation) |
-| change l'interface (écran, bouton, style) | `ui` | pas encore validé |
-| tourne à heure fixe | `scheduler` | pas encore validé |
+| a un réglage modifiable par l'administrateur (page dans Administration) | `ui` | **validé** pour une page d'administration (opportunity-reminders) |
+| change l'interface de SuiteCRM 8 (écran Angular, bouton, style) | `ui` | pas encore validé |
+| tourne à heure fixe | `scheduler` | **validé** (opportunity-reminders) |
 | traduit ou renomme des libellés | `lang` | **validé** avec des champs (french-company-fields) |
 
 **Refuse et renvoie vers un développeur**, en expliquant pourquoi sans jargon :
@@ -215,6 +216,51 @@ Exemple complet : `suitecrm-ext-french-company-validation`. Deux niveaux, mêmes
 - Une extension qui complète celle d'une autre (ici les champs de french-company-fields) ne
   fait rien quand l'autre n'est pas active (champs absents) : le dire dans le README.
 
+## 4 quinquies. Tâche planifiée et page d'administration (validé)
+
+Exemple complet : `suitecrm-ext-opportunity-reminders`.
+
+**La tâche planifiée** : `legacy/Extension/modules/Schedulers/Ext/ScheduledTasks/<slug>.php`
+ajoute le nom d'une fonction à `$job_strings` (`/** @var list<string> $job_strings */`) et
+la déclare (`if (!function_exists(…))`, signature `function <nom>(mixed $job = null): bool`).
+La fonction charge sa classe (`require_once getcwd() . '/custom/include/<slug>/<Classe>.php'`)
+et renvoie `true` (succès dans `job_queue`). Son nom dans la liste « Tâche » du planificateur :
+`$mod_strings['LBL_<NOM EN MAJUSCULES>']` dans
+`legacy/Extension/modules/Schedulers/Ext/Language/`. Le cron du core
+(`bin/console schedulers:run`, chaque minute) l'appelle en administrateur.
+
+- **La ligne du planificateur** (Administration → Planificateur) : créée par
+  `database/install.php` (bean `Schedulers` : `job` = `function::<nom>`, `job_interval`
+  `minute::heure::jour::mois::jour de semaine` à l'heure de l'administrateur, `status`
+  `Active`, **`catch_up` `0`**), supprimée par `database/uninstall.php` (`mark_deleted`).
+  Ne rien créer si une ligne non supprimée a déjà ce `job` : elle appartient à
+  l'administrateur, qui peut changer l'horaire ou la rendre inactive.
+- Lire des lignes en base : `$db->query()` puis `$db->fetchByAssoc($result, false)` (valeurs
+  telles que stockées, déjà encodées en HTML : `d&#039;essais`).
+
+**Un réglage** : dans la table des réglages de SuiteCRM, sans fichier de configuration.
+`BeanFactory::newBean('Administration')`, `retrieveSettings('<categorie>', true)` puis
+`$admin->settings['<categorie>_<cle>']` pour lire, `saveSetting('<categorie>', '<cle>', $valeur)`
+pour écrire. Toujours une valeur par défaut quand rien de valide n'est enregistré.
+
+**La page d'administration** (legacy, s'affiche dans SuiteCRM 8) :
+
+- l'entrée : `legacy/Extension/modules/Administration/Ext/Administration/<slug>.php` ajoute un
+  groupe à `$admin_group_header` (`[titre, '', false, $admin_option_defs, description, icône]`,
+  lien `./index.php?module=Administration&action=<Action>`) ; libellés dans
+  `legacy/Extension/modules/Administration/Ext/Language/` ;
+- l'action : `legacy/Extension/modules/Administration/Ext/ActionFileMap/<slug>.php`
+  (`$action_file_map['<action en minuscules>'] = 'custom/include/<slug>/<Page>.php'`) : le
+  contrôleur charge ce fichier, `$mod_strings` contenant les libellés d'Administration ;
+- le fichier vérifie `is_admin($current_user)` (sinon `sugar_die`), traite le formulaire, puis
+  affiche dans la page de SuiteCRM (en-tête, styles) par une sous-classe de `SugarView` dont
+  `display()` écrit le HTML : `new <Vue>(…)`, `->init()`, `->process()`. Charger
+  `getcwd() . '/include/MVC/View/SugarView.php'` dans ce fichier, **pas** dans celui de la
+  classe ;
+- la logique (ce que fait le formulaire, le HTML échappé) dans une classe pure, testée.
+
+Un bouton « lancer maintenant » sur la page sert en démo : on n'attend pas l'heure prévue.
+
 ## 5. Tester
 
 Dans `tests/<Classe>Test.php`, namespace `SuiteCrmExt\<Namespace>\Tests` :
@@ -314,3 +360,18 @@ fatale PHP dans le hook (signature, fichier introuvable) : `make app@logs`.
   (étape 4 quater) ; vérifier le `fieldDefinition` que renvoie l'API.
 - « Une erreur s'est produite lors de l'enregistrement » sur toute sauvegarde : le hook
   utilise une classe que son fichier ne charge pas (étape 4).
+- Tâche planifiée qui tourne dès l'activation, et non à l'heure prévue : `catch_up` à `1`
+  (l'heure du jour est déjà passée, SuiteCRM la rattrape). Mettre `0` (étape 4 quinquies).
+- PHPStan « Call to an undefined method » sur une méthode de SuiteCRM (ex. `fetchByAssoc`,
+  `mark_deleted`) : le stub du devkit ne la déclare pas. L'y ajouter avec la signature exacte de
+  SuiteCRM, publier une version du devkit (tag), et demander cette version dans le
+  `composer.json` de l'extension (`^0.21.3`) ; jamais d'exception dans PHPStan. Une classe
+  absente du stub du devkit (ex. `SugarView`) peut aller dans `tests/stubs/` de l'extension.
+- Un `require_once` d'un fichier de SuiteCRM en tête d'un fichier de classe : PHPStan l'exécute
+  en chargeant la classe et échoue. Le mettre dans le script qui utilise la classe.
+- Pour essayer une tâche planifiée sans attendre : passer son `job_interval` à
+  `*::*::*::*::*` en base, attendre deux minutes, lire `job_queue` (`status` `done`,
+  `resolution` `success`), puis remettre l'horaire. Garder le réglage réel pendant l'essai : un
+  délai abaissé (1 jour) relance aussi tout le volume généré.
+- Sans `gh` sur le poste : pousser la branche, puis ouvrir la PR sur GitHub (lien affiché par
+  `git push`) en recopiant le titre du commit quand la branche en a plusieurs.
