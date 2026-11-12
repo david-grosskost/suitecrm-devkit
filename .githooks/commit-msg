@@ -2,11 +2,15 @@
 # Rejects commit messages that don't follow Conventional Commits.
 # Enabled by: make git@hooks
 #
+# COMMIT_MSG_MAX_LENGTH: maximum length of the first line (default 72, 0: no
+# limit). The CI sets 0 for the pull requests of Dependabot, whose titles name
+# the full package and the group: often longer, never shortenable.
+#
 # @param string $1 Path to the commit message file (given by Git)
 set -euo pipefail
 
 TYPES='feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert'
-MAX_LENGTH=72
+MAX_LENGTH="${COMMIT_MSG_MAX_LENGTH:-72}"
 
 header="$(head -n1 "$1" | tr -d '\r')"
 
@@ -28,7 +32,7 @@ MSG
   exit 1
 fi
 
-if [ "${#header}" -gt "$MAX_LENGTH" ]; then
+if [ "$MAX_LENGTH" -gt 0 ] && [ "${#header}" -gt "$MAX_LENGTH" ]; then
   printf 'commit-msg : première ligne trop longue (%s caractères, %s maximum)\n' \
     "${#header}" "$MAX_LENGTH" >&2
   exit 1
