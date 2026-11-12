@@ -32,10 +32,10 @@ Pose les questions une par une, en mots simples, et reformule à la fin :
 | Le besoin… | Type | Statut |
 |---|---|---|
 | réagit à un événement (enregistrement, connexion, chaque requête) | `logic-hook` | **validé** (upstream-fixes) |
-| ajoute ou change des champs, un module | `fields` | pas encore validé |
+| ajoute des champs à un module existant (et leur panneau sur la fiche) | `fields` | **validé** (french-company-fields) |
 | change l'interface (écran, bouton, style) | `ui` | pas encore validé |
 | tourne à heure fixe | `scheduler` | pas encore validé |
-| traduit ou renomme des libellés | `lang` | pas encore validé |
+| traduit ou renomme des libellés | `lang` | **validé** avec des champs (french-company-fields) |
 
 **Refuse et renvoie vers un développeur**, en expliquant pourquoi sans jargon :
 modification du cœur de SuiteCRM ou de suitecrm-core, envoi de données hors de SuiteCRM,
@@ -46,8 +46,9 @@ aucun type.
 
 Le dépôt a été créé depuis `suitecrm-extension-template`, nommé `suitecrm-ext-<slug>`.
 
-- **Slug** : minuscules, chiffres et tirets, 40 caractères au plus, en anglais de préférence
-  (`siret-validation`, `upstream-fixes`). Il préfixe tous les fichiers de l'extension.
+- **Slug** : minuscules, chiffres et tirets, 40 caractères au plus, **exclusivement en
+  anglais** (`siret-validation`, `french-company-fields`), comme le nom du dépôt et du
+  paquet. Il préfixe tous les fichiers de l'extension.
 - **Réglages GitHub** : un dépôt créé depuis le modèle n'en hérite pas. Un administrateur du
   dépôt doit, avant le premier merge :
   - dans Settings → Actions → General, cocher « Allow GitHub Actions to create and approve
@@ -55,6 +56,12 @@ Le dépôt a été créé depuis `suitecrm-extension-template`, nommé `suitecrm
   - dans Settings → Rules, importer la règle `main` du modèle (PR obligatoire, relecture du
     code owner, squash uniquement, checks `checks / commit-msg` et `checks / quality`) ;
   - dans Settings → General, cocher « Automatically delete head branches ».
+- **Renommer le paquet sur `main` d'abord**, dans une petite PR à part
+  (`chore: rename the package`) : dans `composer.json`, `name` en
+  `david-grosskost/suitecrm-ext-<slug>` et `description`. Composer prend le nom du paquet sur
+  la branche par défaut : tant que `main` s'appelle encore `suitecrm-ext-exemple`, l'essai
+  dans le core (étape 7) répond « could not be found in any version ». Mettre exactement le
+  même texte que dans la branche de travail, pour éviter un conflit au merge.
 - **Remplacer l'exemple**, dans une branche `feature/<ticket>/<description>` :
   - `extension.json` : `slug`, `name` (français), `description` (le besoin en mots métier,
     20 caractères au moins), `types`, `suitecrm` ;
@@ -105,6 +112,51 @@ tests appellent directement.
 - Hook de module (avec enregistrement) :
   `public function <methode>(\SugarBean $bean, string $event, mixed $arguments = null): void`
 
+## 4 bis. Fabriquer : champs (validé)
+
+Exemple complet : `suitecrm-ext-french-company-fields`. Trois couches :
+
+**Les champs** : `legacy/Extension/modules/<Module>/Ext/Vardefs/<slug>.php`, une entrée
+`$dictionary['<Objet>']['fields']['<champ>']` par champ (`<Objet>` au singulier :
+`Account` pour le module `Accounts`). Préfixer les champs (`fr_siret`) : pas de collision
+avec SuiteCRM ni avec Studio (`_c`). Les colonnes sont créées par la réparation rapide
+(repairDatabase) à l'activation ; un index se déclare dans `$dictionary['<Objet>']['indices']`.
+Annotation obligatoire pour PHPStan :
+
+```php
+/** @var array<string, array<string, array<mixed>>> $dictionary Set by SuiteCRM */
+```
+
+**Les libellés** : `legacy/Extension/modules/<Module>/Ext/Language/{fr_FR,en_us}.<slug>.php`
+(`$mod_strings['LBL_…']`, dont celui du panneau), et les listes déroulantes dans
+`legacy/Extension/application/Ext/Language/{fr_FR,en_us}.<slug>.php`
+(`$app_list_strings['<liste>']`, première clé `''` pour « aucune valeur »). Chacun avec son
+`@var`.
+
+**Le panneau sur la fiche (SuiteCRM 8)** : ajouté à la volée par un
+`ViewDefinitionMapperInterface`, sans toucher aux mises en page de Studio (le panneau
+disparaît avec l'extension).
+
+- Classe dans `backend/ViewDefinitions/`, namespace `App\Extension\<SlugPascalCase>\backend\ViewDefinitions` :
+  le core copie `backend/` et `config/` dans `extensions/<SlugPascalCase>/`, un nom de
+  dossier valide pour PHP. Dans `composer.json`, `autoload-dev` fait pointer ce namespace
+  vers `backend/`.
+- `getModule()` renvoie `'default'` et `map()` reconnaît le module par
+  `strtolower($definition->getId())`. La logique (construire le panneau) dans une classe
+  sans dépendance à SuiteCRM, testée seule.
+- Chaque cellule : `name`, `label`, `type`, `fieldDefinition` (la vardef du champ) ;
+  `['name' => '', 'fieldDefinition' => []]` pour une cellule vide. Ne rien faire si le
+  panneau existe déjà ou si un champ manque (réparation pas encore faite).
+- **Fiche en onglets** (`templateMeta.useTabs`, comme les Comptes) : le front n'affiche que
+  les panneaux listés dans `templateMeta.tabDefs`, clés en majuscules. Ajouter
+  `tabDefs['<CLE_DU_PANNEAU>'] = ['newTab' => true, 'panelDefault' => 'expanded']`, mais
+  **seulement si `tabDefs` n'est pas vide** : sans onglets, tous les panneaux s'affichent,
+  et en ajouter un masquerait les autres.
+- Service dans `config/services/<slug>.yaml`, tagué `view.definition.mapper`.
+- PHPStan ne connaît pas les classes de SuiteCRM 8 : leurs signatures dans
+  `tests/stubs/suitecrm8.stub` (déclaré dans `scanFiles` de `phpstan.dist.neon`, avec
+  `backend` dans `paths`).
+
 ## 5. Tester
 
 Dans `tests/<Classe>Test.php`, namespace `SuiteCrmExt\<Namespace>\Tests` :
@@ -112,7 +164,9 @@ Dans `tests/<Classe>Test.php`, namespace `SuiteCrmExt\<Namespace>\Tests` :
 - les cas métier de l'entretien, un par ligne d'un `DataProvider`, avec un nom en français ;
 - les cas limites (vide, espaces, valeur inattendue) ;
 - **un test qui appelle la méthode du hook exactement comme SuiteCRM** : mêmes arguments,
-  `null` compris.
+  `null` compris ;
+- pour des champs : les définitions (vardefs, libellés dans les deux langues, chaque option
+  de liste traduite) et le panneau, avec et sans onglets.
 
 ## 6. Vérifier (local)
 
@@ -137,7 +191,10 @@ Dans le dossier de suitecrm-core, sur sa propre branche, **sans commiter** :
    `upstream-fixes`), puis `make app@start && make app@logs` : on doit voir
    `activation (…<slug>…)` puis `Réparation rapide faite`.
 4. Refaire l'exemple concret de l'entretien dans https://suitecrm-core.dev.localhost avec
-   la personne.
+   la personne (recharger avec Ctrl+F5). Pour des champs, vérifier aussi les colonnes :
+   `MSYS_NO_PATHCONV=1 docker exec suitecrm-core-db sh -c 'mariadb -u"$MARIADB_USER" -p"$MARIADB_PASSWORD" "$MARIADB_DATABASE" -e "SHOW COLUMNS FROM <table> LIKE \"<prefixe>_%\""'`.
+   Sous Git Bash, toute commande `docker` avec un chemin commençant par `/` prend le
+   préfixe `MSYS_NO_PATHCONV=1`.
 5. Annuler : `git checkout -- composer.json composer.lock && make composer@install`, retirer
    le slug de `.env.local`, `make app@start`.
 
@@ -148,13 +205,20 @@ fatale PHP dans le hook (signature, fichier introuvable) : `make app@logs`.
 
 - Commit en anglais, Conventional Commits : `feat: <ce que fait l'extension>`
   (`fix: …` pour corriger). Le titre de la PR est le même : il devient le message sur `main`.
+  GitHub propose le message du commit quand la branche n'en a qu'un, sinon le nom de la
+  branche (refusé par `checks / commit-msg`) : renommer la PR, ou la créer avec
+  `gh pr create --fill-first`.
 - Description de la PR : le besoin en mots métier, comment il a été vérifié (tests, essai
   local), et ce qu'il reste à faire.
 - Un développeur relit avant le merge (squash). Après le merge, la PR de release ouvre la
   version ; la mergée pose le tag.
 - Ensuite seulement, l'extension peut entrer dans le catalogue de suitecrm-core ou d'un projet
   client (`repositories`, `require` avec `^<version>`, `EXTENSIONS`) : c'est le travail d'un
-  développeur.
+  développeur. La branche de travail est supprimée au merge : `dev-<branche>` ne résout plus,
+  passer à `^<version>`. Une extension métier s'active instance par instance
+  (`EXTENSIONS` dans le `.env.local` de l'instance), pas par défaut dans le core.
+- Déployer une instance (workflow Deploy, Run workflow) : choisir **le tag** de la release
+  dans « Use workflow from ». Avec `main`, le déploiement est ignoré (« Skipped »).
 
 ## Pièges déjà rencontrés
 
@@ -168,3 +232,12 @@ fatale PHP dans le hook (signature, fichier introuvable) : `make app@logs`.
   réglage Actions du dépôt pas fait (étape 3).
 - Merge impossible alors que tout est vert : la relecture obligatoire ; l'auteur ne peut pas
   s'approuver lui-même, un administrateur merge en contournant la règle.
+- Essai dans le core : « could not be found in any version » alors que la branche est
+  poussée : le paquet porte encore le nom du modèle sur `main` (étape 3).
+- `/docker-entrypoint.sh: exec: update: not found` : `composer.json` invalide (virgule
+  finale) ; le vérifier avec
+  `MSYS_NO_PATHCONV=1 docker run --rm -v "$PWD":/app -w /app composer:2 composer validate --no-check-publish`.
+- Champs créés mais panneau absent de la fiche : fiche en onglets, panneau absent de
+  `tabDefs` (étape 4 bis). Vérifier ce que renvoie l'API avant de chercher ailleurs.
+- PHPStan « Cannot access an offset on mixed » sur `$dictionary`, `$mod_strings` ou
+  `$app_list_strings` : il manque le `@var` qui décrit chaque niveau du tableau.
