@@ -104,6 +104,11 @@ jobs:
       - name: Extension format (manifest, composer.json, files)
         run: make extension@validate
 
+      # Extensions with an Angular module (app/): the committed build
+      # (public/) is the one app/ builds against SuiteCRM's sources.
+      - name: Angular module (app/ built into public/)
+        run: make front@check
+
       # Projects with a phpunit.xml.dist.
       - name: Unit tests (PHPUnit)
         run: make test@unit

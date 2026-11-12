@@ -11,6 +11,13 @@ SCRIPTS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Images of the tools: run in Docker, same versions everywhere.
 PHP_IMAGE="php:8.4-cli"
 COMPOSER_IMAGE="composer:2"
+# Builds the Angular module of an extension (make front@build), with the
+# Node.js version SuiteCRM 8.10 is built with.
+NODE_IMAGE="node:22-bookworm"
+# SuiteCRM whose sources an extension's Angular module is built against: the
+# version of suitecrm-core's image. A module built against another version
+# may not load (shared Angular libraries).
+SUITECRM_VERSION="8.10.2"
 HADOLINT_IMAGE="hadolint/hadolint:v2.12.0"
 PLAYWRIGHT_VERSION="1.61.1"
 PLAYWRIGHT_IMAGE="mcr.microsoft.com/playwright:v$PLAYWRIGHT_VERSION-noble"

@@ -16,7 +16,7 @@ const SLUG = '/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/';
 const SLUG_MAX = 40;
 const KEYS = ['$schema', 'slug', 'name', 'description', 'types', 'suitecrm'];
 // Top-level directories an extension may have, besides the repository files.
-const DIRS = ['backend', 'config', 'legacy', 'database', 'tests'];
+const DIRS = ['app', 'backend', 'config', 'legacy', 'database', 'public', 'tests'];
 
 $errors = [];
 
@@ -147,6 +147,29 @@ if ($slug !== '') {
         if (!$inExtension && !$inInclude) {
             $errors[] = "legacy/$file : à ranger dans legacy/Extension/… avec le slug dans le nom du fichier "
                 . "(ex. legacy/Extension/application/Ext/LogicHooks/$slug.php), ou dans legacy/include/$slug/";
+        }
+    }
+}
+
+// 4. The Angular module: its sources (app/), built into public/ (make
+// front@build) and declared to SuiteCRM by config/extension.php, under the
+// extension's directory in SuiteCRM (the slug in PascalCase).
+if ($slug !== '' && (is_dir('app') || is_dir('public'))) {
+    $name = preg_replace_callback('/(?:^|-)([a-z0-9])/', static fn (array $m): string => strtoupper($m[1]), $slug);
+    if (!is_dir('app')) {
+        $errors[] = 'public/ sans app/ : le module Angular se construit depuis ses sources (app/, make front@build)';
+    } elseif (!is_file('public/remoteEntry.js')) {
+        $errors[] = 'app/ sans module construit : make front@build, puis commiter public/';
+    }
+    $config = is_file('config/extension.php') ? (string) file_get_contents('config/extension.php') : '';
+    if ($config === '') {
+        $errors[] = "config/extension.php absent : il déclare le module Angular à SuiteCRM (remoteEntry, remoteName « $name »)";
+    } else {
+        if (!str_contains($config, "'remoteName' => '$name'")) {
+            $errors[] = "config/extension.php : 'remoteName' => '$name' attendu (le slug en PascalCase)";
+        }
+        if (!str_contains($config, "'remoteEntry' => '../extensions/$name/remoteEntry.js'")) {
+            $errors[] = "config/extension.php : 'remoteEntry' => '../extensions/$name/remoteEntry.js' attendu";
         }
     }
 }
