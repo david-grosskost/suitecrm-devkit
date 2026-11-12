@@ -347,8 +347,10 @@ fatale PHP dans le hook (signature, fichier introuvable) : `make app@logs`.
 - Commit en anglais, Conventional Commits : `feat: <ce que fait l'extension>`
   (`fix: …` pour corriger). Le titre de la PR est le même : il devient le message sur `main`.
   GitHub propose le message du commit quand la branche n'en a qu'un, sinon le nom de la
-  branche (refusé par `checks / commit-msg`) : renommer la PR, ou la créer avec
-  `gh pr create --fill-first`.
+  branche (refusé par `checks / commit-msg`). **`make git@pr`** pousse la branche et ouvre la PR
+  avec le titre du premier commit (ou affiche l'adresse de celle déjà ouverte). Une fois par
+  poste : `make git@gh` (installe gh dans `.tools/`), puis la personne se connecte elle-même
+  avec `.tools/bin/gh auth login` : jamais de jeton dans la conversation.
 - Description de la PR : le besoin en mots métier, comment il a été vérifié (tests, essai
   local), et ce qu'il reste à faire.
 - Un développeur relit avant le merge (squash). Après le merge, la PR de release ouvre la
@@ -418,5 +420,8 @@ fatale PHP dans le hook (signature, fichier introuvable) : `make app@logs`.
   des sources : toujours construire avec `make front@build`.
 - `front@build` : « angular.json introuvable » avant `build:core` : lancer
   `yarn merge-angular-json` d'abord (le script du devkit le fait).
-- Sans `gh` sur le poste : pousser la branche, puis ouvrir la PR sur GitHub (lien affiché par
-  `git push`) en recopiant le titre du commit quand la branche en a plusieurs.
+- Sans `make git@pr` (gh pas connecté) : pousser la branche, puis ouvrir la PR sur GitHub
+  (lien affiché par `git push`) en recopiant le titre du commit quand la branche en a plusieurs.
+- Seeder qui écrit une date de modification passée (`date_modified`) : `save()` la remet à
+  maintenant. Mettre `$bean->update_date_modified = false` avant `$seed->update(…)`, plutôt
+  qu'un `UPDATE` SQL que le compte des enregistrements ne voit pas (devkit 0.23 pour PHPStan).

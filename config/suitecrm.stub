@@ -13,6 +13,9 @@ class SugarBean
     /** @var bool */
     public $new_with_id = false;
 
+    /** @var bool false: save() keeps the date_modified set on the bean */
+    public $update_date_modified = true;
+
     public function save(bool $check_notify = false): string
     {
     }
