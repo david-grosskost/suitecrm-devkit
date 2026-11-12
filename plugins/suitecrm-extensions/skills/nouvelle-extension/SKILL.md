@@ -35,7 +35,8 @@ Pose les questions une par une, en mots simples, et reformule à la fin :
 | ajoute des champs à un module existant (et leur panneau sur la fiche) | `fields` | **validé** (french-company-fields) |
 | contrôle une saisie sur la fiche (message sous le champ, enregistrement refusé) | `logic-hook` + `fields` | **validé** (french-company-validation) |
 | a un réglage modifiable par l'administrateur (page dans Administration) | `ui` | **validé** pour une page d'administration (opportunity-reminders) |
-| change l'interface de SuiteCRM 8 (écran Angular, bouton, style) | `ui` | pas encore validé |
+| change l'affichage de SuiteCRM 8 par un module Angular (format des montants, réglage de l'interface) | `ui` | **validé** (front-customizer) |
+| ajoute un écran, un bouton ou un style à SuiteCRM 8 | `ui` | pas encore validé |
 | tourne à heure fixe | `scheduler` | **validé** (opportunity-reminders) |
 | traduit ou renomme des libellés | `lang` | **validé** avec des champs (french-company-fields) |
 
@@ -261,6 +262,38 @@ pour écrire. Toujours une valeur par défaut quand rien de valide n'est enregis
 
 Un bouton « lancer maintenant » sur la page sert en démo : on n'attend pas l'heure prévue.
 
+## 4 sexies. Module Angular de SuiteCRM 8 (validé)
+
+Exemple complet : `suitecrm-ext-front-customizer`. SuiteCRM 8 charge au démarrage de
+l'interface le module Angular déjà compilé d'une extension (module federation) : **le front de
+SuiteCRM n'est jamais recompilé**, ni dans le core ni sur le serveur.
+
+- **`app/`** : les sources, copie de `extensions/defaultExt/app` de SuiteCRM-Core (la version
+  de l'image), `defaultExt` renommé partout en `<Nom>`, le slug en PascalCase
+  (`front-customizer` → `FrontCustomizer`). Le code va dans `app/src/extension.module.ts`.
+- **`public/`** : le module compilé, **commité**. `make front@build` le construit (Docker,
+  Node 22, sources de SuiteCRM gardées dans le volume `suitecrm-front-<version>` : quelques
+  minutes la première fois, moins d'une ensuite). La CI (`make front@check`) reconstruit et
+  échoue si `public/` ne correspond pas à `app/` : reconstruire et commiter `public/` à chaque
+  changement d'`app/`. `app/` et `public/` vont ensemble (`extension@validate`).
+- **`config/extension.php`** : déclare le module à SuiteCRM. Ajouter une entrée
+  `$extensions['<Nom>']` au paramètre `extensions` du conteneur, avec
+  `'remoteEntry' => '../extensions/<Nom>/remoteEntry.js'`, `'remoteName' => '<Nom>'`,
+  `'enabled' => true`. Le core copie `public/` dans `extensions/<Nom>/public/`, et SuiteCRM le
+  recopie dans `public/extensions/<Nom>/` en reconstruisant son cache.
+- **Le travail se fait dans le constructeur de `ExtensionModule`** : SuiteCRM 8.10 n'appelle
+  jamais son `init()`. Les services de SuiteCRM s'injectent par le constructeur
+  (`import {…} from 'core'`, bibliothèque partagée). Un `console.info('<slug> : chargé…')`
+  permet de vérifier le chargement dans la console du navigateur.
+- Test PHP : `config/extension.php` déclare bien le module (`tests/ExtensionConfigTest.php`,
+  avec un stub du `Container` de Symfony dans `tests/stubs/`).
+- **Limite** : les pages de l'ancienne interface affichées dans SuiteCRM 8 (dashlets de
+  l'accueil, pages d'administration) sont faites par le legacy en PHP : le module Angular ne
+  les change pas. Le dire dans le README.
+
+Essai local (étape 7) : ouvrir la console du navigateur après Ctrl+F5 et vérifier que
+`/extensions/<Nom>/remoteEntry.js` répond 200.
+
 ## 5. Tester
 
 Dans `tests/<Classe>Test.php`, namespace `SuiteCrmExt\<Namespace>\Tests` :
@@ -279,6 +312,8 @@ Dans `tests/<Classe>Test.php`, namespace `SuiteCrmExt\<Namespace>\Tests` :
 ```bash
 make extension@validate && make quality@lint && make quality@stan && make test@unit
 ```
+
+Avec un module Angular (`app/`), ajouter `make front@check` (il reconstruit `public/`).
 
 Explique chaque échec en une phrase simple, corrige, relance. Ne désactive jamais une règle
 et n'ajoute jamais d'exception pour faire passer une vérification : demande à un
@@ -373,5 +408,15 @@ fatale PHP dans le hook (signature, fichier introuvable) : `make app@logs`.
   `*::*::*::*::*` en base, attendre deux minutes, lire `job_queue` (`status` `done`,
   `resolution` `success`), puis remettre l'horaire. Garder le réglage réel pendant l'essai : un
   délai abaissé (1 jour) relance aussi tout le volume généré.
+- Module Angular chargé (`remoteEntry.js` en 200) mais sans effet : le code est dans `init()`,
+  que SuiteCRM 8.10 n'appelle pas. Le mettre dans le constructeur (étape 4 sexies).
+- Montants « 67 300 00 € » (virgule décimale perdue) : locale `fr-FR` donnée au
+  `CurrencyFormatter`. SuiteCRM remplace lui-même les séparateurs par ceux de l'utilisateur ;
+  partir de la locale `en` et ne changer que le motif (`#,##0.00 ¤`).
+- `make front@check` en échec alors que rien n'a changé : `public/` construit hors de
+  `make front@build` (autre chemin, autre version de SuiteCRM). Le résultat dépend du chemin
+  des sources : toujours construire avec `make front@build`.
+- `front@build` : « angular.json introuvable » avant `build:core` : lancer
+  `yarn merge-angular-json` d'abord (le script du devkit le fait).
 - Sans `gh` sur le poste : pousser la branche, puis ouvrir la PR sur GitHub (lien affiché par
   `git push`) en recopiant le titre du commit quand la branche en a plusieurs.
