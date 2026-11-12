@@ -133,29 +133,52 @@ Annotation obligatoire pour PHPStan :
 (`$app_list_strings['<liste>']`, première clé `''` pour « aucune valeur »). Chacun avec son
 `@var`.
 
-**Le panneau sur la fiche (SuiteCRM 8)** : ajouté à la volée par un
-`ViewDefinitionMapperInterface`, sans toucher aux mises en page de Studio (le panneau
-disparaît avec l'extension).
+**Le panneau sur la fiche : écrit une fois dans la mise en page de Studio**, par le script
+d'installation (étape 4 ter). Il appartient ensuite à Studio : l'administrateur le déplace,
+le renomme ou le supprime, il n'est jamais remis. Ne pas l'ajouter à la volée (couche
+SuiteCRM 8, `ViewDefinitionMapper`) : Studio ne pourrait plus ni le retirer ni le
+renommer, et des champs déplacés apparaîtraient deux fois.
 
-- Classe dans `backend/ViewDefinitions/`, namespace `App\Extension\<SlugPascalCase>\backend\ViewDefinitions` :
-  le core copie `backend/` et `config/` dans `extensions/<SlugPascalCase>/`, un nom de
-  dossier valide pour PHP. Dans `composer.json`, `autoload-dev` fait pointer ce namespace
-  vers `backend/`.
-- `getModule()` renvoie `'default'` et `map()` reconnaît le module par
-  `strtolower($definition->getId())`. La logique (construire le panneau) dans une classe
-  sans dépendance à SuiteCRM, testée seule.
-- Chaque cellule : `name`, `label`, `type`, `fieldDefinition` (la vardef du champ) ;
-  `['name' => '', 'fieldDefinition' => []]` pour une cellule vide. Ne rien faire si le
-  panneau existe déjà ou si un champ manque (réparation pas encore faite).
-- **Fiche en onglets** (`templateMeta.useTabs`, comme les Comptes) : le front n'affiche que
-  les panneaux listés dans `templateMeta.tabDefs`, clés en majuscules. Ajouter
-  `tabDefs['<CLE_DU_PANNEAU>'] = ['newTab' => true, 'panelDefault' => 'expanded']`, mais
-  **seulement si `tabDefs` n'est pas vide** : sans onglets, tous les panneaux s'affichent,
-  et en ajouter un masquerait les autres.
-- Service dans `config/services/<slug>.yaml`, tagué `view.definition.mapper`.
-- PHPStan ne connaît pas les classes de SuiteCRM 8 : leurs signatures dans
-  `tests/stubs/suitecrm8.stub` (déclaré dans `scanFiles` de `phpstan.dist.neon`, avec
-  `backend` dans `paths`).
+- La logique dans une classe sans dépendance à SuiteCRM, `legacy/include/<slug>/`, testée
+  seule (exemple : `StudioPanel`). Elle travaille sur le format de Studio pendant l'édition
+  (`GridLayoutMetaDataParser::$_viewdefs`) : panneaux → lignes → noms de champs.
+- Une case vide se note **`(filler)`** : `(empty)` est supprimé à l'enregistrement, et le
+  champ voisin prend alors toute la ligne.
+- Clé du panneau en majuscules (`LBL_FR_COMPANY_PANEL`), qui est aussi la clé de son titre
+  dans les libellés du module.
+- **Fiche en onglets** (`templateMeta.tabDefs` non vide, comme les Comptes) : y ajouter
+  `['newTab' => true, 'panelDefault' => 'expanded']` pour le panneau. Sans `tabDefs`, ne rien
+  y mettre : tous les panneaux s'affichent, et un onglet masquerait les autres.
+- Ne rien ajouter si le panneau ou un de ses champs est déjà dans la mise en page (placé par
+  Studio).
+
+## 4 ter. Scripts d'installation et données de démo (validé)
+
+Lancés par le core (`scripts/extension-script.php`), dans SuiteCRM, en administrateur, le
+dossier courant étant `public/legacy` :
+
+- **`database/install.php`** : une fois, après la réparation rapide de la première
+  activation (le core note `.extensions/<slug>.installed`). Pour ce qui se fait une fois dans
+  SuiteCRM : un panneau dans une mise en page de Studio, par exemple
+  (`ParserFactory::getParser(MB_DETAILVIEW, '<Module>')`, modifier `$_viewdefs`,
+  `handleSave(false)`). Une version suivante de l'extension ne le relance pas.
+- **`database/uninstall.php`** : à la désactivation, avant que les fichiers soient retirés
+  (SuiteCRM connaît encore les champs). Défaire ce qu'a fait l'installation, sans rien
+  supprimer d'autre : retirer les champs de la mise en page où qu'ils soient, le panneau s'il
+  est vide. Réactivée, l'extension s'installe de nouveau. Les colonnes et leurs données
+  restent en base.
+- **`database/seeders/<slug>/seeders.php`** : renvoie la liste des seeders de l'extension
+  (contrat dans le `database/README.md` du core), chargés par `make db@seed` quand
+  l'extension est active. Pour compléter les comptes d'un autre seeder : `dependsOn()` le
+  nomme, et `$seed->update($bean, $champs)` n'écrit **que les champs vides** (une valeur
+  saisie en démo reste).
+- Charger ses propres classes par `__DIR__` (`__DIR__ . '/../legacy/include/<slug>/…'`), le
+  code de SuiteCRM par `getcwd()` (`getcwd() . '/modules/ModuleBuilder/…'`) : PHPStan
+  n'a pas SuiteCRM, un chemin écrit en dur échoue à l'analyse.
+- Ce que PHPStan ne connaît pas (Studio, seeders du core) : `tests/stubs/suitecrm.stub`,
+  dans `scanFiles` de `phpstan.dist.neon`, avec `database` dans `paths`. Dans
+  `composer.json`, `autoload-dev` fait pointer `SuiteCrmExt\<Namespace>\` vers
+  `legacy/include/<slug>/` (puis `make composer@install` pour régénérer l'autoload).
 
 ## 5. Tester
 
@@ -166,7 +189,9 @@ Dans `tests/<Classe>Test.php`, namespace `SuiteCrmExt\<Namespace>\Tests` :
 - **un test qui appelle la méthode du hook exactement comme SuiteCRM** : mêmes arguments,
   `null` compris ;
 - pour des champs : les définitions (vardefs, libellés dans les deux langues, chaque option
-  de liste traduite) et le panneau, avec et sans onglets.
+  de liste traduite) et le panneau dans la mise en page de Studio : ajout avec et sans
+  onglets, rien si un champ est déjà placé, retrait où que Studio ait mis les champs ;
+- pour un seeder : ce qu'il calcule (fonctions pures), et qu'il ne remplace jamais une valeur.
 
 ## 6. Vérifier (local)
 
@@ -239,5 +264,13 @@ fatale PHP dans le hook (signature, fichier introuvable) : `make app@logs`.
   `MSYS_NO_PATHCONV=1 docker run --rm -v "$PWD":/app -w /app composer:2 composer validate --no-check-publish`.
 - Champs créés mais panneau absent de la fiche : fiche en onglets, panneau absent de
   `tabDefs` (étape 4 bis). Vérifier ce que renvoie l'API avant de chercher ailleurs.
+- Un champ du panneau prend toute la ligne : case vide notée `(empty)` au lieu de
+  `(filler)`.
+- `Class "SuiteCrmExt\…" not found` dans les tests après un changement d'`autoload-dev` :
+  autoload pas régénéré, `make composer@install`.
+- Un commit parti alors qu'une vérification a échoué : enchaîner vérifications et commit sur
+  une seule ligne, avec `&&`.
+- Studio dans le navigateur : le modifier depuis SuiteCRM (Administration → Studio) ; un
+  redémarrage de l'app déconnecte les sessions.
 - PHPStan « Cannot access an offset on mixed » sur `$dictionary`, `$mod_strings` ou
   `$app_list_strings` : il manque le `@var` qui décrit chaque niveau du tableau.
