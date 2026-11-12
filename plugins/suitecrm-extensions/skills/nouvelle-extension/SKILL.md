@@ -33,6 +33,7 @@ Pose les questions une par une, en mots simples, et reformule à la fin :
 |---|---|---|
 | réagit à un événement (enregistrement, connexion, chaque requête) | `logic-hook` | **validé** (upstream-fixes) |
 | ajoute des champs à un module existant (et leur panneau sur la fiche) | `fields` | **validé** (french-company-fields) |
+| contrôle une saisie sur la fiche (message sous le champ, enregistrement refusé) | `logic-hook` + `fields` | **validé** (french-company-validation) |
 | change l'interface (écran, bouton, style) | `ui` | pas encore validé |
 | tourne à heure fixe | `scheduler` | pas encore validé |
 | traduit ou renomme des libellés | `lang` | **validé** avec des champs (french-company-fields) |
@@ -61,7 +62,12 @@ Le dépôt a été créé depuis `suitecrm-extension-template`, nommé `suitecrm
   `david-grosskost/suitecrm-ext-<slug>` et `description`. Composer prend le nom du paquet sur
   la branche par défaut : tant que `main` s'appelle encore `suitecrm-ext-exemple`, l'essai
   dans le core (étape 7) répond « could not be found in any version ». Mettre exactement le
-  même texte que dans la branche de travail, pour éviter un conflit au merge.
+  même texte que dans la branche de travail, pour éviter un conflit au merge. Le check
+  `extension@validate` de cette PR échoue (le slug de `extension.json` est encore `exemple`) :
+  c'est attendu, l'administrateur la fusionne en contournant la règle ; la PR suivante remet
+  tout en ordre.
+- Dependabot ouvre aussitôt une PR qui passe le devkit à sa dernière version (composer.json et
+  workflows ensemble) : la fusionner d'abord.
 - **Remplacer l'exemple**, dans une branche `feature/<ticket>/<description>` :
   - `extension.json` : `slug`, `name` (français), `description` (le besoin en mots métier,
     20 caractères au moins), `types`, `suitecrm` ;
@@ -103,7 +109,10 @@ $hook_array['<evenement>'][] = [
 **La classe** : `legacy/include/<slug>/<Classe>.php`, namespace `SuiteCrmExt\<Namespace>`
 (le slug en PascalCase : `upstream-fixes` → `UpstreamFixes`), `declare(strict_types=1)`,
 `final class`. La méthode du hook ne fait qu'appeler des méthodes statiques pures, que les
-tests appellent directement.
+tests appellent directement. **SuiteCRM ne charge que le fichier déclaré dans le hook** :
+les autres classes dont il se sert, ce fichier les charge lui-même
+(`require_once __DIR__ . '/<Autre>.php';`), sinon chaque enregistrement plante. Les tests ne le
+voient pas (l'autoload de Composer charge tout).
 
 **Signature de la méthode : exactement celle avec laquelle SuiteCRM l'appelle.**
 
@@ -179,6 +188,32 @@ dossier courant étant `public/legacy` :
   dans `scanFiles` de `phpstan.dist.neon`, avec `database` dans `paths`. Dans
   `composer.json`, `autoload-dev` fait pointer `SuiteCrmExt\<Namespace>\` vers
   `legacy/include/<slug>/` (puis `make composer@install` pour régénérer l'autoload).
+
+## 4 quater. Contrôler une saisie sur la fiche (validé)
+
+Exemple complet : `suitecrm-ext-french-company-validation`. Deux niveaux, mêmes règles
+(fonctions pures dans `legacy/include/<slug>/`) :
+
+- **Pendant la saisie (SuiteCRM 8)** : un `asyncValidator` sur le champ, que la fiche appelle
+  avant d'enregistrer ; tant qu'il répond une erreur, la fiche refuse l'enregistrement et
+  affiche le message sous le champ.
+  - L'ajouter par un `FieldDefinitionMapperInterface` (`backend/FieldDefinitions/`,
+    `getModule()` `'default'`, module reconnu par `strtolower($definition->getId())`), qui
+    ajoute `asyncValidators['<slug>'] = ['key' => '<processus>', 'params' => […]]` aux champs
+    voulus. **Pas dans les fichiers de champs** (`Ext/Vardefs`) : l'ordre de fusion des
+    extensions n'est pas garanti, l'ajout est perdu.
+  - Le processus : un `ProcessHandlerInterface` (`backend/Process/`, `getProcessType()` = la
+    clé). Il reçoit `options['value']` et `options['params']` ; en erreur :
+    `setStatus('error')` et `setData(['errors' => ['startLabelKey' => '<LBL_…>']])`.
+  - **Le message dans `$app_strings`** (`legacy/Extension/application/Ext/Language/`) : la
+    fiche ne le cherche que là, pas dans les libellés du module (sinon, message vide).
+  - Classes SuiteCRM 8 enregistrées et taguées par le core, sans fichier de services.
+- **À chaque enregistrement (toute voie : import, API, workflow)** : un hook `before_save`
+  qui nettoie la saisie (`$bean->{$champ} = …`) et refuse en levant une exception. SuiteCRM 8
+  n'affiche alors qu'un message générique (« Une erreur s'est produite… ») : c'est le dernier
+  rempart, la fiche a déjà prévenu l'utilisateur.
+- Une extension qui complète celle d'une autre (ici les champs de french-company-fields) ne
+  fait rien quand l'autre n'est pas active (champs absents) : le dire dans le README.
 
 ## 5. Tester
 
@@ -274,3 +309,8 @@ fatale PHP dans le hook (signature, fichier introuvable) : `make app@logs`.
   redémarrage de l'app déconnecte les sessions.
 - PHPStan « Cannot access an offset on mixed » sur `$dictionary`, `$mod_strings` ou
   `$app_list_strings` : il manque le `@var` qui décrit chaque niveau du tableau.
+- Contrôle de saisie qui bloque la fiche sans message : libellé dans `$mod_strings` au lieu
+  de `$app_strings`. Qui ne se déclenche pas : `asyncValidators` mis dans `Ext/Vardefs`
+  (étape 4 quater) ; vérifier le `fieldDefinition` que renvoie l'API.
+- « Une erreur s'est produite lors de l'enregistrement » sur toute sauvegarde : le hook
+  utilise une classe que son fichier ne charge pas (étape 4).
