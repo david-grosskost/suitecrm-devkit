@@ -140,13 +140,19 @@ foreach (glob('*', GLOB_ONLYDIR) ?: [] as $dir) {
 if ($slug !== '') {
     // Legacy layer: registrations in Extension/ (Quick Repair merges them),
     // named after the slug so that no two extensions write the same file;
-    // their PHP classes in include/<slug>/.
+    // their PHP classes in include/<slug>/. One override point of SuiteCRM
+    // too: include/SugarFields/Fields/<Type>/SugarField<Type>.php, which
+    // SuiteCRM loads instead of its own (class CustomSugarField<Type>, a
+    // subclass). Its path is set by SuiteCRM, so it cannot carry the slug:
+    // the core refuses a second extension overriding the same type.
     foreach (filesUnder('legacy') as $file) {
         $inExtension = str_starts_with($file, 'Extension/') && str_contains(basename($file), $slug);
         $inInclude = str_starts_with($file, "include/$slug/");
-        if (!$inExtension && !$inInclude) {
+        $isFieldOverride = preg_match('#^include/SugarFields/Fields/([A-Z][A-Za-z]*)/SugarField\1\.php$#', $file) === 1;
+        if (!$inExtension && !$inInclude && !$isFieldOverride) {
             $errors[] = "legacy/$file : à ranger dans legacy/Extension/… avec le slug dans le nom du fichier "
-                . "(ex. legacy/Extension/application/Ext/LogicHooks/$slug.php), ou dans legacy/include/$slug/";
+                . "(ex. legacy/Extension/application/Ext/LogicHooks/$slug.php), dans legacy/include/$slug/, "
+                . 'ou surcharger un type de champ (legacy/include/SugarFields/Fields/<Type>/SugarField<Type>.php)';
         }
     }
 }

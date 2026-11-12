@@ -289,7 +289,20 @@ SuiteCRM n'est jamais recompilé**, ni dans le core ni sur le serveur.
   avec un stub du `Container` de Symfony dans `tests/stubs/`).
 - **Limite** : les pages de l'ancienne interface affichées dans SuiteCRM 8 (dashlets de
   l'accueil, pages d'administration) sont faites par le legacy en PHP : le module Angular ne
-  les change pas. Le dire dans le README.
+  les change pas. Pour l'affichage d'un type de champ, voir la surcharge ci-dessous ; sinon,
+  le dire dans le README.
+
+**Surcharger l'affichage legacy d'un type de champ** (exemple : `suitecrm-ext-french-currency-format`,
+montants des dashlets) : SuiteCRM charge
+`custom/include/SugarFields/Fields/<Type>/SugarField<Type>.php` à la place du sien et utilise
+la classe `CustomSugarField<Type>` si elle existe. Dans l'extension :
+`legacy/include/SugarFields/Fields/<Type>/SugarField<Type>.php` (seul chemin hors du slug
+qu'accepte `extension@validate`), qui charge la classe de SuiteCRM
+(`require_once getcwd() . '/include/SugarFields/Fields/<Type>/SugarField<Type>.php'`) et sa
+logique (`require_once __DIR__ . '/../../../<slug>/<Classe>.php'`), puis déclare
+`class CustomSugarField<Type> extends SugarField<Type>` qui ne fait qu'appeler cette logique
+pure, testée. Une seule extension par type : le core refuse qu'une autre écrase le fichier.
+La classe de SuiteCRM va dans `tests/stubs/suitecrm.stub` pour PHPStan.
 
 Essai local (étape 7) : ouvrir la console du navigateur après Ctrl+F5 et vérifier que
 `/extensions/<Nom>/remoteEntry.js` répond 200.
