@@ -14,6 +14,7 @@
 // - scripts/post_install.php (generated): Quick Repair, as Administration →
 //   Repair does it (the Module Loader merges the extensions, but does not
 //   create the columns of new fields), then database/install.php if any;
+//   the message a script returns goes to the log of SuiteCRM;
 // - scripts/pre_uninstall.php (generated), when there is a
 //   database/uninstall.php: run before the files are taken out.
 //
@@ -164,12 +165,20 @@ $generated['scripts/post_install.php'] = $header
         . "    foreach (['" . implode("', '", $modules) . "'] as \$module) {\n"
         . "        \$studio->forget(\$module);\n"
         . "    }\n")
-        . "\n    require __DIR__ . '/../database/install.php';\n" : '')
+        . "\n    // The script returns its message (echo is refused by the scanner):\n"
+        . "    // kept in the log of SuiteCRM.\n"
+        . "    \$message = require __DIR__ . '/../database/install.php';\n"
+        . "    if (is_string(\$message)) {\n"
+        . "        \$GLOBALS['log']->info(\$message);\n"
+        . "    }\n" : '')
     . "}\n";
 if (isset($scripts['uninstall'])) {
     $generated['scripts/pre_uninstall.php'] = $header
         . "function pre_uninstall(): void\n{\n"
-        . "    require __DIR__ . '/../database/uninstall.php';\n"
+        . "    \$message = require __DIR__ . '/../database/uninstall.php';\n"
+        . "    if (is_string(\$message)) {\n"
+        . "        \$GLOBALS['log']->info(\$message);\n"
+        . "    }\n"
         . "}\n";
 }
 

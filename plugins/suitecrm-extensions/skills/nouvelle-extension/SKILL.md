@@ -178,6 +178,9 @@ dossier courant étant `public/legacy` :
   supprimer d'autre : retirer les champs de la mise en page où qu'ils soient, le panneau s'il
   est vide. Réactivée, l'extension s'installe de nouveau. Les colonnes et leurs données
   restent en base.
+- Un script **renvoie son message** (`return 'mon-slug : panneau ajouté.';`, `return` aussi
+  pour s'arrêter plus tôt) et n'affiche rien : `echo` est refusé par le scanner du Chargeur de
+  module (7 bis). Le core l'affiche dans ses logs, le paquet le note dans le journal de SuiteCRM.
 - **`database/seeders/<slug>/seeders.php`** : renvoie la liste des seeders de l'extension
   (contrat dans le `database/README.md` du core), chargés par `make db@seed` quand
   l'extension est active. Pour compléter les comptes d'un autre seeder : `dependsOn()` le
@@ -371,6 +374,14 @@ la release le joint à la version sur GitHub.
 - Les scripts d'installation tournent alors **dans une fonction** : pas de variable
   attendue d'ailleurs, `global` pour celles de SuiteCRM (`$current_user`, `$sugar_config`),
   `return` pour s'arrêter.
+- **Le scanner du Chargeur de module** (désactivé par défaut dans SuiteCRM, mais certains
+  hébergeurs l'activent) refuse tout le paquet pour un seul appel interdit, dans `legacy/`,
+  `backend/`, `config/` ou `database/`, tests exclus. Les plus courants : les fonctions à
+  callback (`array_map`, `array_filter`, `usort`, `call_user_func`…) → une boucle ; les appels
+  `$fonction()` → une méthode ; `echo`, `exit`/`die` ; et les fonctions de fichiers
+  (`file_get_contents`, `file_exists`, `is_file`, `mkdir`, `copy`, `rename`, `unlink`,
+  `getimagesize`, `readfile`…) → passer par les classes de SuiteCRM. La liste complète est
+  dans `ModuleInstall/ModuleScanner.php` de SuiteCRM.
 - Le paquet n'accepte que la version mineure de SuiteCRM du module Angular (8.10.x).
 
 Essai : dans https://suitecrm-core.dev.localhost, l'extension **retirée** de `EXTENSIONS`
