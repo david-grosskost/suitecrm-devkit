@@ -355,6 +355,29 @@ Dans le dossier de suitecrm-core, sur sa propre branche, **sans commiter** :
 Si le conteneur redémarre en boucle après l'activation, c'est presque toujours une erreur
 fatale PHP dans le hook (signature, fichier introuvable) : `make app@logs`.
 
+## 7 bis. Paquet du Module Loader
+
+Chaque extension doit aussi s'installer **sans l'image de suitecrm-core**, sur n'importe
+quel SuiteCRM 8 : Administration → Chargeur de module. `make package@build` fabrique le
+paquet dans `build/<slug>-<version>.zip` (jamais commité) ; la CI le fabrique à chaque PR, et
+la release le joint à la version sur GitHub.
+
+- Il reprend les mêmes dossiers que l'image : `backend/`, `config/`, `public/` vont dans
+  `extensions/<Nom>/`, `legacy/…` dans `custom/…`. Rien à déclarer : un fichier hors de ces
+  dossiers n'est pas dans le paquet.
+- Après la copie, le paquet lance la réparation rapide (le Chargeur de module ne crée pas
+  les colonnes des nouveaux champs), puis `database/install.php`. `database/uninstall.php`
+  tourne avant la désinstallation. Les seeders restent hors du paquet.
+- Les scripts d'installation tournent alors **dans une fonction** : pas de variable
+  attendue d'ailleurs, `global` pour celles de SuiteCRM (`$current_user`, `$sugar_config`),
+  `return` pour s'arrêter.
+- Le paquet n'accepte que la version mineure de SuiteCRM du module Angular (8.10.x).
+
+Essai : dans https://suitecrm-core.dev.localhost, l'extension **retirée** de `EXTENSIONS`
+(sinon ses fichiers sont déjà là), Administration → Chargeur de module → téléverser le
+zip → Installer ; refaire l'exemple concret ; puis Désinstaller et vérifier que tout est
+revenu comme avant.
+
 ## 8. Pull request
 
 - Commit en anglais, Conventional Commits : `feat: <ce que fait l'extension>`

@@ -12,6 +12,8 @@
 #    known vulnerabilities (make security@image), then pushed to GHCR, tagged
 #    with the version. Done here and not on the tag event: a tag
 #    created with GITHUB_TOKEN does not trigger other workflows.
+# 3. Extensions (an extension.json): their Module Loader package (make
+#    package@build) is attached to the release.
 #
 # Outputs release_created and version: the project can chain its demo
 # deployment (deploy.yml), which then starts once the image is pushed.
@@ -49,6 +51,7 @@ jobs:
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
       version: ${{ steps.release.outputs.version }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
       - id: release
         uses: googleapis/release-please-action@v5
@@ -106,3 +109,28 @@ jobs:
 
       - name: Push the image
         run: docker push "ghcr.io/${{ github.repository }}:${{ needs.release-please.outputs.version }}"
+
+  # Extensions (projects with an extension.json): their Module Loader package
+  # (make package@build) is attached to the GitHub release, ready to install
+  # on any SuiteCRM 8 without the image of suitecrm-core.
+  package:
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install the devkit
+        if: hashFiles('extension.json') != ''
+        run: make
+
+      - name: Attach the Module Loader package to the release
+        if: hashFiles('extension.json') != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.release-please.outputs.tag_name }}
+        run: |
+          make package@build
+          gh release upload "$TAG" build/*.zip

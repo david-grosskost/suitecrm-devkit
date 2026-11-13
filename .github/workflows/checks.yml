@@ -104,6 +104,11 @@ jobs:
       - name: Extension format (manifest, composer.json, files)
         run: make extension@validate
 
+      # Extensions: their Module Loader package (installed without the image
+      # of suitecrm-core) builds.
+      - name: Module Loader package (make package@build)
+        run: make package@build
+
       # Extensions with an Angular module (app/): the committed build
       # (public/) is the one app/ builds against SuiteCRM's sources.
       - name: Angular module (app/ built into public/)
