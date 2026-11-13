@@ -132,7 +132,7 @@ if ($composer !== null) {
 
 // 3. Where the files are.
 foreach (glob('*', GLOB_ONLYDIR) ?: [] as $dir) {
-    if (!in_array($dir, [...DIRS, 'vendor'], true)) {
+    if (!in_array($dir, [...DIRS, 'vendor', 'build'], true)) {
         $errors[] = "dossier « $dir » non prévu (dossiers possibles : " . implode(', ', DIRS) . ')';
     }
 }
