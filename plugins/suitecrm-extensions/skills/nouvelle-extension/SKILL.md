@@ -389,6 +389,11 @@ Essai : dans https://suitecrm-core.dev.localhost, l'extension **retirée** de `E
 zip → Installer ; refaire l'exemple concret ; puis Désinstaller et vérifier que tout est
 revenu comme avant.
 
+**Jamais les deux à la fois** : une extension s'installe soit par le Chargeur de module, soit
+par `EXTENSIONS` du core. Installée par le Chargeur, ses fichiers sont dans `custom/` : le core
+refuse de les écraser et l'instance ne démarre plus. La désinstaller d'abord (Chargeur de
+module → Désinstaller), puis l'ajouter à `EXTENSIONS`.
+
 ## 8. Pull request
 
 - Commit en anglais, Conventional Commits : `feat: <ce que fait l'extension>`
