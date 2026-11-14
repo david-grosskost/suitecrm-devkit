@@ -4,7 +4,11 @@
 
 PACKAGE_SCRIPTS := $(patsubst %/,%,$(dir $(lastword $(MAKEFILE_LIST))))/scripts
 
-.PHONY: package@build
+.PHONY: package@build package@scan
 
 package@build:
 	@$(PACKAGE_SCRIPTS)/package/build.sh
+
+# The scanner of SuiteCRM's Module Loader on that package (make package@build first).
+package@scan:
+	@$(PACKAGE_SCRIPTS)/package/scan.sh

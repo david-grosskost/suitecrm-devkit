@@ -381,7 +381,8 @@ la release le joint à la version sur GitHub.
   `$fonction()` → une méthode ; `echo`, `exit`/`die` ; et les fonctions de fichiers
   (`file_get_contents`, `file_exists`, `is_file`, `mkdir`, `copy`, `rename`, `unlink`,
   `getimagesize`, `readfile`…) → passer par les classes de SuiteCRM. La liste complète est
-  dans `ModuleInstall/ModuleScanner.php` de SuiteCRM.
+  dans `ModuleInstall/ModuleScanner.php` de SuiteCRM. `make package@scan` (après
+  `make package@build`) passe le paquet au vrai scanner, comme la CI à chaque PR.
 - Le paquet n'accepte que la version mineure de SuiteCRM du module Angular (8.10.x).
 
 Essai : dans https://suitecrm-core.dev.localhost, l'extension **retirée** de `EXTENSIONS`
