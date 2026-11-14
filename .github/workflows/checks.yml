@@ -109,6 +109,11 @@ jobs:
       - name: Module Loader package (make package@build)
         run: make package@build
 
+      # The package passes the scanner of SuiteCRM's Module Loader, as an
+      # instance with the scan on would check it.
+      - name: Module Loader scanner (make package@scan)
+        run: make package@scan
+
       # Extensions with an Angular module (app/): the committed build
       # (public/) is the one app/ builds against SuiteCRM's sources.
       - name: Angular module (app/ built into public/)
