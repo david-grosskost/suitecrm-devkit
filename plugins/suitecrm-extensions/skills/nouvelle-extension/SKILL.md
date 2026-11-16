@@ -371,6 +371,15 @@ la release le joint à la version sur GitHub.
 - Après la copie, le paquet lance la réparation rapide (le Chargeur de module ne crée pas
   les colonnes des nouveaux champs), puis `database/install.php`. `database/uninstall.php`
   tourne avant la désinstallation. Les seeders restent hors du paquet.
+- **Mise à jour** (une version plus récente installée par-dessus) : le Chargeur de module
+  ne désinstalle pas, il recopie les fichiers et relance la réparation rapide ;
+  `database/install.php` **ne tourne pas à nouveau** (noté en base, table `config`,
+  catégorie `extension_installed`), pour ne pas défaire ce que l'administrateur a changé
+  depuis. La désinstallation efface cette note. Un changement de données à apporter par
+  une nouvelle version ne passe donc pas par `install.php`. SuiteCRM ne reconnaît pas la
+  mise à jour d'une version 0.x (bug de `UpgradeHistory::determineIfUpgrade`) : il
+  l'installe comme un nouveau paquet ; le script généré retire alors la ligne de
+  l'ancienne version de la liste des paquets installés.
 - Les scripts d'installation tournent alors **dans une fonction** : pas de variable
   attendue d'ailleurs, `global` pour celles de SuiteCRM (`$current_user`, `$sugar_config`),
   `return` pour s'arrêter.

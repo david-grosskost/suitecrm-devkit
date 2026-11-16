@@ -13,10 +13,19 @@
 //   taken out, or the one it replaced restored;
 // - scripts/post_install.php (generated): Quick Repair, as Administration →
 //   Repair does it (the Module Loader merges the extensions, but does not
-//   create the columns of new fields), then database/install.php if any;
+//   create the columns of new fields), then database/install.php if any,
+//   once: the Module Loader runs post_install again at each update of the
+//   package (a newer version installed over the old one, with no uninstall),
+//   and an install script is not to undo what the administrator changed
+//   since (a panel removed in Studio, a scheduler deleted). Done is noted in
+//   the config table (category extension_installed, name: the slug). It also
+//   takes out the line of an older version left in the list of installed
+//   packages (SuiteCRM does not see the update of a 0.x version);
 //   the message a script returns goes to the log of SuiteCRM;
-// - scripts/pre_uninstall.php (generated), when there is a
-//   database/uninstall.php: run before the files are taken out.
+// - scripts/pre_uninstall.php (generated), when there is an install or an
+//   uninstall script: database/uninstall.php if any, before the files are
+//   taken out, and the note above forgotten (installed again, the install
+//   script runs again).
 //
 // Written to build/<slug>-<version>.zip, the version of
 // .release-please-manifest.json. Run from the extension's root, by
@@ -29,6 +38,8 @@ declare(strict_types=1);
 const OUT = 'build';
 // Directories of the SuiteCRM 8 layer, copied to extensions/<Name>/.
 const CORE_DIRS = ['backend', 'config', 'public'];
+// Category of the config table where a run install script is noted.
+const MARKER = 'extension_installed';
 
 /**
  * Stops with a message in French.
@@ -150,11 +161,28 @@ $generated['scripts/post_install.php'] = $header
     . "    require_once 'modules/Administration/QuickRepairAndRebuild.php';\n"
     . "    \$all = is_array(\$mod_strings) && is_string(\$mod_strings['LBL_ALL_MODULES'] ?? null) ? \$mod_strings['LBL_ALL_MODULES'] : 'All Modules';\n"
     . "    (new RepairAndClear())->repairAndClearAll(['clearAll'], [\$all], true, false);\n"
-    . (isset($scripts['install']) ? ($modules === [] ? '' : "\n"
+    . "\n"
+    . "    // SuiteCRM does not see that a 0.x version updates another one\n"
+    . "    // (UpgradeHistory::determineIfUpgrade compares with \"0\"): it installs it\n"
+    . "    // as a new package and keeps the line of the old version, shown as\n"
+    . "    // installed once this one is uninstalled. That line is taken out here,\n"
+    . "    // unless SuiteCRM did see the update (it then rewrites the line itself).\n"
+    . "    \$db = DBManagerFactory::getInstance();\n"
+    . "    \$slug = \$db->quoted(" . var_export($slug, true) . ");\n"
+    . "    if (empty(\$_REQUEST['previous_id'])) {\n"
+    . "        \$db->query(\"DELETE FROM upgrade_history WHERE id_name = {\$slug}\");\n"
+    . "    }\n"
+    . (isset($scripts['install']) ? "\n"
+        . "    // database/install.php runs once: not again when the package is updated\n"
+        . "    // (the Module Loader calls post_install at each version installed).\n"
+        . "    \$done = \$db->fetchByAssoc(\$db->query(\"SELECT value FROM config WHERE category = '" . MARKER . "' AND name = {\$slug}\"));\n"
+        . "    if (is_array(\$done)) {\n"
+        . "        return;\n"
+        . "    }\n"
+        . ($modules === [] ? '' : "\n"
         . "    // Studio (database/install.php may change a layout) keeps the modules it\n"
         . "    // read earlier in this request, with their fields from before the\n"
-        . "    // install: it would drop the new ones. Forgotten here, read again. The\n"
-        . "    // core runs the script in its own process.\n"
+        . "    // install: it would drop the new ones. Forgotten here, read again.\n"
         . "    require_once 'modules/ModuleBuilder/Module/StudioModuleFactory.php';\n"
         . "    \$studio = new class () extends StudioModuleFactory {\n"
         . "        public function forget(string \$module): void\n"
@@ -170,15 +198,21 @@ $generated['scripts/post_install.php'] = $header
         . "    \$message = require __DIR__ . '/../database/install.php';\n"
         . "    if (is_string(\$message)) {\n"
         . "        \$GLOBALS['log']->info(\$message);\n"
-        . "    }\n" : '')
+        . "    }\n"
+        . "    \$db->query(\"INSERT INTO config (category, name, value) VALUES ('" . MARKER . "', {\$slug}, '1')\");\n" : '')
     . "}\n";
-if (isset($scripts['uninstall'])) {
+if ($scripts !== []) {
     $generated['scripts/pre_uninstall.php'] = $header
         . "function pre_uninstall(): void\n{\n"
-        . "    \$message = require __DIR__ . '/../database/uninstall.php';\n"
-        . "    if (is_string(\$message)) {\n"
-        . "        \$GLOBALS['log']->info(\$message);\n"
-        . "    }\n"
+        . (isset($scripts['uninstall'])
+            ? "    \$message = require __DIR__ . '/../database/uninstall.php';\n"
+            . "    if (is_string(\$message)) {\n"
+            . "        \$GLOBALS['log']->info(\$message);\n"
+            . "    }\n" : '')
+        . (isset($scripts['install'])
+            ? "    // Installed again, database/install.php runs again.\n"
+            . "    \$db = DBManagerFactory::getInstance();\n"
+            . "    \$db->query(\"DELETE FROM config WHERE category = '" . MARKER . "' AND name = \" . \$db->quoted(" . var_export($slug, true) . "));\n" : '')
         . "}\n";
 }
 
