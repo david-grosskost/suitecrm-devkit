@@ -8,13 +8,21 @@ name: Checks
 on:
   workflow_call:
 
+# One run at a time per branch: a new push cancels the run still going on the
+# same branch, instead of queueing behind it. In a called workflow, github.*
+# is the caller's context, so the group is already per project and per branch.
+# Never on main: there, a cancelled run would hide a failure nobody sees again.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   # Runs the commit-msg hook on every pushed commit, so that commits made
   # without the local hook (web UI, other clone…) are checked too.
   commit-msg:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
@@ -81,7 +89,7 @@ jobs:
   quality:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install the devkit and its tools (gitleaks, shellcheck)
         run: |
