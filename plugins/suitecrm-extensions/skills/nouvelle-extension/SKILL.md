@@ -165,25 +165,27 @@ renommer, et des champs déplacés apparaîtraient deux fois.
 
 ## 4 ter. Scripts d'installation et données de démo (validé)
 
-Lancés par le core (`scripts/extension-script.php`), dans SuiteCRM, en administrateur, le
+Lancés par le paquet du Chargeur de module (7 bis), dans SuiteCRM, en administrateur, le
 dossier courant étant `public/legacy` :
 
-- **`database/install.php`** : une fois, après la réparation rapide de la première
-  activation (le core note `.extensions/<slug>.installed`). Pour ce qui se fait une fois dans
-  SuiteCRM : un panneau dans une mise en page de Studio, par exemple
-  (`ParserFactory::getParser(MB_DETAILVIEW, '<Module>')`, modifier `$_viewdefs`,
-  `handleSave(false)`). Une version suivante de l'extension ne le relance pas.
-- **`database/uninstall.php`** : à la désactivation, avant que les fichiers soient retirés
+- **`database/install.php`** : une fois, après la réparation rapide de l'installation. Pour
+  ce qui se fait une fois dans SuiteCRM : un panneau dans une mise en page de Studio, par
+  exemple (`ParserFactory::getParser(MB_DETAILVIEW, '<Module>')`, modifier `$_viewdefs`,
+  `handleSave(false)`). Une version suivante de l'extension ne le relance pas : le paquet
+  note l'installation en base (table `config`, catégorie `extension_installed`).
+- **`database/uninstall.php`** : à la désinstallation, avant que les fichiers soient retirés
   (SuiteCRM connaît encore les champs). Défaire ce qu'a fait l'installation, sans rien
   supprimer d'autre : retirer les champs de la mise en page où qu'ils soient, le panneau s'il
-  est vide. Réactivée, l'extension s'installe de nouveau. Les colonnes et leurs données
+  est vide. Réinstallée, l'extension s'installe de nouveau. Les colonnes et leurs données
   restent en base.
+- Les deux tournent **dans une fonction** : pas de variable attendue d'ailleurs, `global`
+  pour celles de SuiteCRM (`$current_user`, `$sugar_config`), `return` pour s'arrêter.
 - Un script **renvoie son message** (`return 'mon-slug : panneau ajouté.';`, `return` aussi
   pour s'arrêter plus tôt) et n'affiche rien : `echo` est refusé par le scanner du Chargeur de
-  module (7 bis). Le core l'affiche dans ses logs, le paquet le note dans le journal de SuiteCRM.
+  module (7 bis). SuiteCRM le note dans son journal.
 - **`database/seeders/<slug>/seeders.php`** : renvoie la liste des seeders de l'extension
   (contrat dans le `database/README.md` du core), chargés par `make db@seed` quand
-  l'extension est active. Pour compléter les comptes d'un autre seeder : `dependsOn()` le
+  l'extension est installée. Pour compléter les comptes d'un autre seeder : `dependsOn()` le
   nomme, et `$seed->update($bean, $champs)` n'écrit **que les champs vides** (une valeur
   saisie en démo reste).
 - Charger ses propres classes par `__DIR__` (`__DIR__ . '/../legacy/include/<slug>/…'`), le
@@ -344,26 +346,34 @@ Dans le dossier de suitecrm-core, sur sa propre branche, **sans commiter** :
    et l'extension dans `require` (`"david-grosskost/suitecrm-ext-<slug>": "dev-<branche>"`),
    **sans virgule après la dernière ligne** ; pousser la branche de l'extension avant.
 2. `make composer@update PACKAGES=david-grosskost/suitecrm-ext-<slug>`
-3. Ajouter le slug à `EXTENSIONS` dans `.env.local` (séparés par des virgules, garder
-   `upstream-fixes`), puis `make app@start && make app@logs` : on doit voir
-   `activation (…<slug>…)` puis `Réparation rapide faite`.
+3. `make app@start` : l'image est refabriquée, et le catalogue d'extensions avec. Puis
+   `make extensions@install SLUGS=<slug>`, qui affiche la réparation rapide et le message
+   du script d'installation s'il y en a un. `make extensions@list` doit alors montrer
+   l'extension **installée** ; Administration → Chargeur de module la montre aussi.
 4. Refaire l'exemple concret de l'entretien dans https://suitecrm-core.dev.localhost avec
    la personne (recharger avec Ctrl+F5). Pour des champs, vérifier aussi les colonnes :
    `MSYS_NO_PATHCONV=1 docker exec suitecrm-core-db sh -c 'mariadb -u"$MARIADB_USER" -p"$MARIADB_PASSWORD" "$MARIADB_DATABASE" -e "SHOW COLUMNS FROM <table> LIKE \"<prefixe>_%\""'`.
    Sous Git Bash, toute commande `docker` avec un chemin commençant par `/` prend le
    préfixe `MSYS_NO_PATHCONV=1`.
-5. Annuler : `git checkout -- composer.json composer.lock && make composer@install`, retirer
-   le slug de `.env.local`, `make app@start`.
+5. Annuler : `make extensions@uninstall SLUGS=<slug>`, puis
+   `git checkout -- composer.json composer.lock && make composer@install && make app@start`.
 
-Si le conteneur redémarre en boucle après l'activation, c'est presque toujours une erreur
+**Après chaque correction du code de l'extension**, refaire
+`make composer@update PACKAGES=…` puis `make app@start` ne suffit pas : une extension déjà
+installée n'est reprise que si le catalogue apporte un **numéro de version plus récent**, et
+une branche de travail garde le même. Désinstaller puis réinstaller
+(`make extensions@uninstall SLUGS=<slug> && make extensions@install SLUGS=<slug>`).
+
+Si le conteneur redémarre en boucle après l'installation, c'est presque toujours une erreur
 fatale PHP dans le hook (signature, fichier introuvable) : `make app@logs`.
 
-## 7 bis. Paquet du Module Loader
+## 7 bis. Paquet du Chargeur de module
 
-Chaque extension doit aussi s'installer **sans l'image de suitecrm-core**, sur n'importe
-quel SuiteCRM 8 : Administration → Chargeur de module. `make package@build` fabrique le
-paquet dans `build/<slug>-<version>.zip` (jamais commité) ; la CI le fabrique à chaque PR, et
-la release le joint à la version sur GitHub.
+Le paquet est **la seule façon dont une extension s'installe** : à la main sur n'importe quel
+SuiteCRM 8 (Administration → Chargeur de module), ou par l'image de suitecrm-core, qui l'y
+dépose et l'installe pour l'instance. `make package@build` fabrique le paquet dans
+`build/<slug>-<version>.zip` (jamais commité) ; la CI le fabrique à chaque PR, et la release
+le joint à la version sur GitHub.
 
 - Il reprend les mêmes dossiers que l'image : `backend/`, `config/`, `public/` vont dans
   `extensions/<Nom>/`, `legacy/…` dans `custom/…`. Rien à déclarer : un fichier hors de ces
@@ -379,10 +389,9 @@ la release le joint à la version sur GitHub.
   une nouvelle version ne passe donc pas par `install.php`. SuiteCRM ne reconnaît pas la
   mise à jour d'une version 0.x (bug de `UpgradeHistory::determineIfUpgrade`) : il
   l'installe comme un nouveau paquet ; le script généré retire alors la ligne de
-  l'ancienne version de la liste des paquets installés.
-- Les scripts d'installation tournent alors **dans une fonction** : pas de variable
-  attendue d'ailleurs, `global` pour celles de SuiteCRM (`$current_user`, `$sugar_config`),
-  `return` pour s'arrêter.
+  l'ancienne version de la liste des paquets installés. Le core fait cette mise à jour tout
+  seul au démarrage de l'instance, pour les extensions déjà installées dont l'image apporte
+  une version plus récente.
 - **Le scanner du Chargeur de module** (désactivé par défaut dans SuiteCRM, mais certains
   hébergeurs l'activent) refuse tout le paquet pour un seul appel interdit, dans `legacy/`,
   `backend/`, `config/` ou `database/`, tests exclus. Les plus courants : les fonctions à
@@ -394,15 +403,11 @@ la release le joint à la version sur GitHub.
   `make package@build`) passe le paquet au vrai scanner, comme la CI à chaque PR.
 - Le paquet n'accepte que la version mineure de SuiteCRM du module Angular (8.10.x).
 
-Essai : dans https://suitecrm-core.dev.localhost, l'extension **retirée** de `EXTENSIONS`
-(sinon ses fichiers sont déjà là), Administration → Chargeur de module → téléverser le
-zip → Installer ; refaire l'exemple concret ; puis Désinstaller et vérifier que tout est
-revenu comme avant.
-
-**Jamais les deux à la fois** : une extension s'installe soit par le Chargeur de module, soit
-par `EXTENSIONS` du core. Installée par le Chargeur, ses fichiers sont dans `custom/` : le core
-refuse de les écraser et l'instance ne démarre plus. La désinstaller d'abord (Chargeur de
-module → Désinstaller), puis l'ajouter à `EXTENSIONS`.
+Essai : dans https://suitecrm-core.dev.localhost, l'extension désinstallée
+(`make extensions@uninstall SLUGS=<slug>`), Administration → Chargeur de module → Installer
+sur sa ligne, que l'image y a déposée ; refaire l'exemple concret ; puis Désinstaller et
+vérifier que tout est revenu comme avant. Pour s'assurer qu'elle s'installe aussi **sans
+l'image**, téléverser le zip de `make package@build` sur un SuiteCRM 8 ordinaire.
 
 ## 8. Pull request
 
@@ -418,10 +423,12 @@ module → Désinstaller), puis l'ajouter à `EXTENSIONS`.
 - Un développeur relit avant le merge (squash). Après le merge, la PR de release ouvre la
   version ; la mergée pose le tag.
 - Ensuite seulement, l'extension peut entrer dans le catalogue de suitecrm-core ou d'un projet
-  client (`repositories`, `require` avec `^<version>`, `EXTENSIONS`) : c'est le travail d'un
-  développeur. La branche de travail est supprimée au merge : `dev-<branche>` ne résout plus,
-  passer à `^<version>`. Une extension métier s'active instance par instance
-  (`EXTENSIONS` dans le `.env.local` de l'instance), pas par défaut dans le core.
+  client (`repositories`, `require` avec `^<version>`) : c'est le travail d'un développeur. La
+  branche de travail est supprimée au merge : `dev-<branche>` ne résout plus, passer à
+  `^<version>`. Y entrer la rend **disponible** sur toutes les instances, pas installée : une
+  extension métier s'installe instance par instance (Chargeur de module, ou
+  `make extensions@install`). Seules les extensions obligatoires (`required-extensions` dans
+  le `composer.json` du core) sont installées d'office à la création d'une instance.
 - Déployer une instance (workflow Deploy, Run workflow) : choisir **le tag** de la release
   dans « Use workflow from ». Avec `main`, le déploiement est ignoré (« Skipped »).
 
