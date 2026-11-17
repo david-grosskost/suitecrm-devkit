@@ -12,16 +12,50 @@ Le propriétaire du dépôt est le seul à pouvoir les poser.
 
 - **Enforcement status** : `Active`.
 - **Target branches** : `Include default branch`.
-- **Bypass list** : vide. Personne ne contourne, pas même toi — c'est ce qui garantit
-  qu'aucun changement n'atteint `main` sans relecture.
 - Cocher :
-  - **Require a pull request before merging** — relecture humaine obligatoire.
+  - **Require a pull request before merging**, avec **0 approbation exigée** et sans
+    relecture CODEOWNERS (voir ci-dessous).
   - **Require status checks to pass** → ajouter `checks / commit-msg` et `checks / quality`.
   - **Block force pushes** (`non_fast_forward`) — l'historique ne se réécrit pas.
   - **Restrict deletions** — `main` ne se supprime pas par accident.
 
 Ces deux contrôles n'apparaissent dans la liste qu'après avoir tourné au moins une fois :
 ouvre une première pull request, puis reviens les ajouter.
+
+### Zéro approbation, et pourquoi
+
+Exiger une approbation paraît plus sûr, mais sur un dépôt tenu par une seule personne c'est
+l'inverse : on ne peut pas approuver sa propre pull request, donc **plus rien ne se
+fusionne** — et la seule issue est d'ajouter une dérogation, qui emporte alors *tous* les
+contrôles de la règle, y compris la CI. C'est exactement ce qui est arrivé aux premières
+extensions : elles exigeaient une approbation, la dérogation a été ajoutée pour débloquer,
+et des pull requests de release sont passées sans qu'aucun contrôle ne tourne, sans que
+personne ne s'en aperçoive.
+
+Avec 0 approbation, la règle reste utilisable seul **et** mord vraiment : pull request
+obligatoire, CI verte obligatoire. Le jour où une deuxième personne travaille sur le dépôt,
+on monte le compteur à 1 et on retire la dérogation.
+
+### La dérogation qui reste, et jusqu'à quand
+
+**Bypass list** : le rôle **Repository admin**, en mode **Pull requests** uniquement.
+
+Elle n'existe que pour une raison : release-please crée sa pull request de version avec le
+jeton par défaut de GitHub Actions, et GitHub ne déclenche aucun workflow sur une pull
+request créée par ce jeton — pour éviter les boucles. Les contrôles ne se posent donc
+jamais sur une PR de release, qui resterait bloquée indéfiniment.
+
+Les dépôts qui ont un `RELEASE_TOKEN` (ci-dessous) n'ont pas ce problème et **ne doivent
+pas avoir de dérogation du tout**.
+
+Jamais le mode **Always** : il autorise aussi les pushes directs sur `main`.
+
+Cette dérogation disparaît le jour où une **GitHub App** remplace les jetons personnels :
+installée une fois sur l'organisation, elle fabrique à la volée un jeton de courte durée
+pour chaque dépôt, les workflows se déclenchent normalement, et plus aucun secret n'est à
+recopier. C'est le bon moment pour la mettre en place : au passage sur le GitHub de
+l'entreprise. Sur un compte personnel elle n'apporte rien, sa clé privée devant être
+recopiée dans chaque dépôt.
 
 ## Règle sur les tags de version
 
