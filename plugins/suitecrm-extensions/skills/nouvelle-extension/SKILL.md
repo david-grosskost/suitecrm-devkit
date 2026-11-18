@@ -494,3 +494,36 @@ l'image**, téléverser le zip de `make package@build` sur un SuiteCRM 8 ordinai
 - Seeder qui écrit une date de modification passée (`date_modified`) : `save()` la remet à
   maintenant. Mettre `$bean->update_date_modified = false` avant `$seed->update(…)`, plutôt
   qu'un `UPDATE` SQL que le compte des enregistrements ne voit pas (devkit 0.23 pour PHPStan).
+- Menu des modules vide dans toute l'interface après l'installation d'une extension : elle
+  ajoute un groupe d'administration (`$admin_group_header[]` dans
+  `modules/Administration/Ext/Administration/`). SuiteCRM 8 construit son menu à partir de
+  cette structure et n'en revient pas. Déclarer l'entrée **sans** créer de groupe ne casse
+  rien mais ne l'affiche nulle part : tant que ce n'est pas résolu, une page
+  d'administration s'atteint par son adresse (`index.php?entryPoint=…`). Ne jamais
+  **affecter** `$admin_option_defs` non plus : le tableau est partagé par toutes les
+  extensions, l'affectation efface celles déclarées avant.
+- Extension mise à jour, rien ne change dans le navigateur : `remoteEntry.js` est le seul
+  fichier du module fédéré **sans empreinte dans son nom**, et Apache ne pose aucun
+  `Cache-Control`. Le navigateur sert l'ancienne table des matières, donc l'ancien code.
+  Ctrl+Shift+R pour essayer ; distinguer le cache du paquet en comparant
+  `fetch(url)` et `fetch(url, {cache:'reload'})`.
+- Icône ou élément ajouté à une entrée de menu qui disparaît à chaque changement d'écran :
+  Angular **recrée tout le menu** (une entrée sur trente survit). Faire peindre par la
+  feuille de style plutôt qu'ajouter : rien dans le balisage ne nomme le module, mais
+  `:has(a[href*="return_module=X&"])` atteint les adresses de son sous-menu, et une règle
+  par module s'applique dès que SuiteCRM dessine l'entrée.
+- Libellé périmé sur une entrée de menu (le nom d'un module, le sous-menu d'un autre) :
+  la décoration a vidé le lien pour y mettre son contenu. Angular réutilise ces éléments
+  pour d'autres modules ; **ajouter autour** de ce qu'il écrit, jamais détruire, et comparer
+  à chaque passe le module que l'entrée désigne pour refaire la décoration quand il change.
+- Masquer un libellé avec `opacity: 0` lui laisse sa largeur : un centrage le compte encore.
+  Le sortir du flux (`display: none`) quand la place manque.
+- `repair.php` ou tout script PHP lancé sans `-u www-data` : le cache Symfony est recréé en
+  root, Apache ne peut plus l'écrire, l'instance répond 500 **sans rien journaliser**.
+  Vérifier avec `ls -ld cache cache/prod`, réparer avec un `chown -R www-data:www-data`.
+- SuiteCRM n'affiche que huit modules dans son menu et replie le reste dans « Options », qui
+  ne porte pas les sous-menus. Deux plafonds à lever : `default_max_tabs` côté historique
+  (par `Configurator::handleOverride()` à l'installation) et `themes.navigation_tab_limits`
+  côté SuiteCRM 8. Le second se surcharge **depuis l'extension** : SuiteCRM importe de
+  lui-même `../extensions/*/config/services/*.yaml` et `config/packages/*.yaml`, donc rien
+  du cœur n'est touché.
