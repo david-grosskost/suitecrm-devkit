@@ -67,6 +67,19 @@ function filesUnder(string $dir): array
     return $files;
 }
 
+/**
+ * The slug in PascalCase, the name SuiteCRM knows the extension by: its
+ * directory for the Angular module, and its theme's name.
+ */
+function pascalCase(string $slug): string
+{
+    return (string) preg_replace_callback(
+        '/(?:^|-)([a-z0-9])/',
+        static fn (array $m): string => strtoupper($m[1]),
+        $slug,
+    );
+}
+
 // 1. The manifest.
 $manifest = readJson('extension.json', $errors);
 $slug = '';
@@ -145,13 +158,23 @@ if ($slug !== '') {
     // SuiteCRM loads instead of its own (class CustomSugarField<Type>, a
     // subclass). Its path is set by SuiteCRM, so it cannot carry the slug:
     // the core refuses a second extension overriding the same type.
+    //
+    // An extension may also ship a theme of its own, under themes/<Name>/,
+    // copied to custom/themes/<Name>/. A theme is named by its directory,
+    // which is its identity in SuiteCRM and what keeps two extensions apart,
+    // so its files do not carry the slug. What it holds is SuiteCRM's affair
+    // (themedef.php, css/, images/), not this validator's.
+    $theme = pascalCase($slug);
+
     foreach (filesUnder('legacy') as $file) {
         $inExtension = str_starts_with($file, 'Extension/') && str_contains(basename($file), $slug);
         $inInclude = str_starts_with($file, "include/$slug/");
+        $inTheme = str_starts_with($file, "themes/$theme/");
         $isFieldOverride = preg_match('#^include/SugarFields/Fields/([A-Z][A-Za-z]*)/SugarField\1\.php$#', $file) === 1;
-        if (!$inExtension && !$inInclude && !$isFieldOverride) {
+        if (!$inExtension && !$inInclude && !$inTheme && !$isFieldOverride) {
             $errors[] = "legacy/$file : à ranger dans legacy/Extension/… avec le slug dans le nom du fichier "
                 . "(ex. legacy/Extension/application/Ext/LogicHooks/$slug.php), dans legacy/include/$slug/, "
+                . "dans legacy/themes/$theme/ pour un thème, "
                 . 'ou surcharger un type de champ (legacy/include/SugarFields/Fields/<Type>/SugarField<Type>.php)';
         }
     }
@@ -161,7 +184,7 @@ if ($slug !== '') {
 // front@build) and declared to SuiteCRM by config/extension.php, under the
 // extension's directory in SuiteCRM (the slug in PascalCase).
 if ($slug !== '' && (is_dir('app') || is_dir('public'))) {
-    $name = preg_replace_callback('/(?:^|-)([a-z0-9])/', static fn (array $m): string => strtoupper($m[1]), $slug);
+    $name = pascalCase($slug);
     if (!is_dir('app')) {
         $errors[] = 'public/ sans app/ : le module Angular se construit depuis ses sources (app/, make front@build)';
     } elseif (!is_file('public/remoteEntry.js')) {
