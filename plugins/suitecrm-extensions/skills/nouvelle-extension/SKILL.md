@@ -52,6 +52,11 @@ Pose les questions une par une, en mots simples, et reformule à la fin :
 3. **Quand** : à l'enregistrement, à l'affichage, chaque nuit, à la connexion… ?
 4. **Pour qui** : tous les utilisateurs, certains seulement ?
 5. **Comment vérifier** : qu'est-ce qui prouvera que ça marche ? Ce sera le test.
+6. **Et l'existant** : si la règle porte sur des données (format, valeur calculée), faut-il
+   aussi corriger les enregistrements déjà saisis ? Explique que c'est **définitif** : la
+   désinstallation ne remettra pas les anciennes valeurs, et toute instance qui installe
+   l'extension verra ses fiches modifiées d'un coup. Par défaut, ne rien corriger : la règle
+   s'applique aux prochains enregistrements.
 
 Écris le besoin en 3 à 5 phrases métier : elles serviront à `extension.json`, au README et
 à la pull request. Fais-les valider avant d'écrire du code.

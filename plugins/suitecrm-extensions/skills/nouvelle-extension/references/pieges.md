@@ -114,3 +114,7 @@
   libellé : aucune traduction ne l'atteint.
 - Une route de SuiteCRM 8 vers un écran historique respecte la casse de l'action :
   `#/administration/UpgradeWizard?view=module`, pas `upgradewizard` (page blanche).
+- Chargeur de module : les deux listes se superposent, sans barre de défilement. Les tableaux
+  (YUI) calculent leur hauteur à l'affichage ; affichés pendant que l'onglet n'était pas
+  visible (navigateur piloté), ils la prennent nulle. F5 remet tout en place : un défaut de
+  SuiteCRM, pas de l'extension.

@@ -25,8 +25,11 @@ lis-le d'abord.
 
 ## 2. Essayer
 
-1. **Installer** par Administration → Chargeur de module (Claude in Chrome si disponible,
-   sinon la personne, guidée écran par écran). Noter le message du script d'installation.
+1. **Installer** par Administration → Chargeur de module. Le navigateur : **Claude in
+   Chrome**. Dans Claude Code, il s'active avec `/chrome` dans la zone de saisie (ou en
+   lançant `claude --chrome`) ; s'il n'est pas disponible, demande à la personne de
+   l'activer, ou de cliquer elle-même, guidée écran par écran. Ne passe pas à un autre
+   navigateur sans le lui demander. Noter le message du script d'installation.
 2. **L'exemple concret**, après Ctrl+F5 : faire la saisie, constater le résultat. Pour un
    cas d'erreur prévu (contrôle de saisie), le provoquer aussi.
 3. **Ce qui ne doit pas changer** : un autre module, un enregistrement sans rapport.
