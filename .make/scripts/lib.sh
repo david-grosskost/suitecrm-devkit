@@ -176,3 +176,35 @@ tool () {
     return 1
   fi
 }
+
+# Runs a Playwright suite of the devkit (tests/<suite>/) against the instance,
+# in the Playwright image: nothing is written to the project folder. When the
+# reverse proxy runs on this machine, the browser goes straight to Traefik on
+# the shared network: Chromium resolves every *.localhost name to itself and
+# ignores /etc/hosts, so the address is forced with --host-resolver-rules
+# (HOST_RESOLVER_RULES, read by playwright.config.ts). In local, the mkcert
+# certificate is not trusted inside the container: HTTPS errors are ignored
+# there only. Credentials are passed by name (-e KEY): never printed.
+#
+# @param string $1 Suite: folder of tests/ (smoke, regression)
+playwright_run () {
+  local ip tests args=(-e "BASE_URL=https://$APP_HOST" -e ADMIN_USER -e ADMIN_PASSWORD)
+  # Absolute path, as Docker Desktop understands it: works from vendor/ as
+  # from a devkit checkout next to the project.
+  tests="$(cd "$SCRIPTS/../../tests/$1" && { pwd -W 2>/dev/null || pwd; })"
+  ip="$(traefik_ip)"
+  if [ -n "$ip" ]; then
+    args+=(--network "$NETWORK" -e "HOST_RESOLVER_RULES=MAP $APP_HOST $ip")
+  fi
+  if [ "$APP_ENV" = local ]; then
+    args+=(-e IGNORE_HTTPS_ERRORS=1)
+  fi
+
+  run docker run --rm --ipc=host "${args[@]}" \
+    -v "$tests:/tests:ro" \
+    -v playwright-npm-cache:/root/.npm \
+    "$PLAYWRIGHT_IMAGE" bash -c "
+      cp -r /tests /tmp/$1 && cd /tmp/$1 \
+      && npm install --silent --no-save --no-audit --no-fund @playwright/test@$PLAYWRIGHT_VERSION \
+      && npx playwright test"
+}
