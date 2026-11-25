@@ -15,11 +15,13 @@ Le propriétaire du dépôt est le seul à pouvoir les poser.
 - Cocher :
   - **Require a pull request before merging**, avec **0 approbation exigée** et sans
     relecture CODEOWNERS (voir ci-dessous).
-  - **Require status checks to pass** → ajouter `checks / commit-msg` et `checks / quality`.
+  - **Require status checks to pass** → ajouter `checks / commit-msg` et `checks / quality`,
+    plus `regression / regression` pour suitecrm-core et les projets clients (le test de
+    régression, voir [Workflows](workflows.md#contrôles-obligatoires)).
   - **Block force pushes** (`non_fast_forward`) — l'historique ne se réécrit pas.
   - **Restrict deletions** — `main` ne se supprime pas par accident.
 
-Ces deux contrôles n'apparaissent dans la liste qu'après avoir tourné au moins une fois :
+Ces contrôles n'apparaissent dans la liste qu'après avoir tourné au moins une fois :
 ouvre une première pull request, puis reviens les ajouter.
 
 ### Zéro approbation, et pourquoi
