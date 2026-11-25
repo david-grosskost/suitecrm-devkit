@@ -1,0 +1,77 @@
+# Regression test of a SuiteCRM project, called by each project's CI:
+#   jobs:
+#     regression:
+#       uses: david-grosskost/suitecrm-devkit/.github/workflows/regression.yml@vX.Y.Z
+#
+# Builds the project's image and installs a local instance on the runner, as
+# a developer would: the reverse proxy first (Traefik, local certificate),
+# then SuiteCRM with EVERY extension of the image installed, and the demo
+# data. Then make test@regression goes through the main screens. Catches an
+# extension that breaks SuiteCRM or another extension before the merge.
+name: Regression
+
+on:
+  workflow_call:
+    inputs:
+      seed:
+        description: Load the demo data (make db@seed) before the test
+        type: boolean
+        default: true
+
+# One run at a time per branch, as in checks.yml. Never cancelled on main.
+concurrency:
+  group: ${{ github.workflow }}-regression-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The same reverse proxy as on a developer machine: the project's
+      # containers join its network and Traefik serves *.dev.localhost.
+      - name: Reverse proxy
+        run: |
+          git clone --depth 1 https://github.com/david-grosskost/reverse-proxy.git "$RUNNER_TEMP/reverse-proxy"
+          cd "$RUNNER_TEMP/reverse-proxy"
+          make app@install
+
+      - name: Install the devkit
+        run: make
+
+      # Local instance: .env.local and its passwords are generated, SuiteCRM
+      # is installed with the extensions installed by default.
+      - name: Install SuiteCRM
+        run: make app@install
+
+      # Every extension the image carries, not only those installed by
+      # default: the test must see them all together.
+      - name: Install every extension of the image
+        run: |
+          set -euo pipefail
+          container="$(grep '^APP_SLUG=' .env | cut -d= -f2)-app"
+          slugs="$(docker exec -u www-data "$container" php -r '
+            foreach (json_decode((string) file_get_contents("/usr/local/share/suitecrm/extensions/index.json"), true) as $e) {
+              echo $e["slug"], " ";
+            }')"
+          echo "Extensions : $slugs"
+          # shellcheck disable=SC2086
+          docker exec -u www-data "$container" php /usr/local/share/suitecrm/packages.php install $slugs
+          docker exec -u www-data "$container" php /usr/local/share/suitecrm/packages.php list
+
+      - name: Demo data
+        if: inputs.seed
+        run: make db@seed
+
+      - name: Regression test
+        run: make test@regression
+
+      # make app@logs follows the logs: the last lines are enough here.
+      - name: Logs of SuiteCRM
+        if: failure()
+        run: |
+          container="$(grep '^APP_SLUG=' .env | cut -d= -f2)-app"
+          docker logs --tail 200 "$container" || true
+          docker exec "$container" sh -c 'tail -n 100 /var/www/html/public/legacy/suitecrm.log 2>/dev/null' || true
