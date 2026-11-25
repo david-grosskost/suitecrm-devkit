@@ -16,7 +16,8 @@ const SLUG = '/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/';
 const SLUG_MAX = 40;
 const KEYS = ['$schema', 'slug', 'name', 'description', 'types', 'suitecrm'];
 // Top-level directories an extension may have, besides the repository files.
-const DIRS = ['app', 'backend', 'config', 'legacy', 'database', 'public', 'tests'];
+// docs/ is the extension's documentation: never part of its package.
+const DIRS = ['app', 'backend', 'config', 'legacy', 'database', 'docs', 'public', 'tests'];
 
 $errors = [];
 

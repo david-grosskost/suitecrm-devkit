@@ -47,6 +47,7 @@ Le `name` de `composer.json` doit se terminer par `/suitecrm-ext-<slug>`.
 | `database/install.php`, `uninstall.php` | — | lancés à l'installation (une seule fois) et à la désinstallation |
 | `database/seeders/<slug>/` | catalogue de l'image | données de démo, chargées par `make db@seed` |
 | `tests/` | — | tests unitaires |
+| `docs/` | — | documentation de l'extension (voir le modèle) |
 
 `make extension@validate` refuse un fichier rangé ailleurs : deux extensions ne peuvent
 ainsi jamais écrire le même fichier. Seule exception, imposée par SuiteCRM : la surcharge
