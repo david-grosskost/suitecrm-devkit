@@ -45,6 +45,8 @@ plus, ni moins ? Un comportement non décrit est un défaut, même utile.
   fonctions de fichiers…) dans `legacy/`, `backend/`, `config/` ou `database/` ;
 - `install.php` qui écrase ce que l'administrateur a pu changer, ou `uninstall.php` qui
   supprime plus que ce que l'installation a fait ;
+- hook qui transforme un texte du `$bean` sans le décoder puis le ré-encoder (`&amp;`
+  devient `&AMP;`) ;
 - `install.php` qui modifie des données déjà saisies sans que la documentation dise que
   c'est demandé et définitif (à faire confirmer par la personne qui a exprimé le besoin).
 
@@ -55,6 +57,10 @@ plus, ni moins ? Un comportement non décrit est un défaut, même utile.
 - libellé manquant dans une des deux langues, texte visible en anglais ;
 - documentation qui ne dit plus vrai, lien cassé entre pages ;
 - titre de PR au-delà de 65 caractères, commit hors Conventional Commits.
+
+Ne pas signaler : l'absence de `CHANGELOG.md` avant la première version (le skill fait
+supprimer celui du modèle, release-please le crée), ni ce que le skill `nouvelle-extension`
+demande expressément. En cas de doute, ses références font foi.
 
 **Les remarques** : lisibilité, nommage, simplifications. Pas de goût personnel présenté
 comme une règle.

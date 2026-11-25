@@ -118,3 +118,5 @@
   (YUI) calculent leur hauteur à l'affichage ; affichés pendant que l'onglet n'était pas
   visible (navigateur piloté), ils la prennent nulle. F5 remet tout en place : un défaut de
   SuiteCRM, pas de l'extension.
+- Nom affiché « DUPONT &AMP; FILS » après un hook qui met en majuscules : la valeur du `$bean`
+  était encodée en HTML. Décoder, transformer, ré-encoder (logic-hook.md).
