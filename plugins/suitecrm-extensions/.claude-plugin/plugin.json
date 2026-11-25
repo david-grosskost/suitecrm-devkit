@@ -1,10 +1,14 @@
 {
     "name": "suitecrm-extensions",
-    "version": "0.7.0",
-    "description": "Créer et faire évoluer les extensions SuiteCRM 8 des projets de David Grosskost, même sans connaissance technique : entretien sur le besoin, fabrication depuis le modèle, vérifications, pull request.",
+    "version": "0.8.0",
+    "description": "Créer, relire et essayer les extensions SuiteCRM 8 des projets de David Grosskost, même sans connaissance technique, avec ou sans Docker : entretien sur le besoin, fabrication depuis le modèle, vérifications, relecture, essai, pull request.",
     "author": {
         "name": "David Grosskost"
     },
     "repository": "https://github.com/david-grosskost/suitecrm-devkit",
-    "keywords": ["suitecrm", "extension", "crm"]
+    "keywords": [
+        "suitecrm",
+        "extension",
+        "crm"
+    ]
 }

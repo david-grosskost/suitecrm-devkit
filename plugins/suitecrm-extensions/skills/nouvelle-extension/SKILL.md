@@ -1,17 +1,46 @@
 ---
 name: nouvelle-extension
-description: Guide la création ou la modification d'une extension SuiteCRM 8 (dépôt suitecrm-ext-<slug>, créé depuis suitecrm-extension-template), de l'entretien sur le besoin métier jusqu'à la pull request, y compris avec une personne sans connaissance technique. À utiliser quand on demande d'ajouter un comportement à SuiteCRM (« quand on enregistre un compte… », « ajouter un champ… », « corriger tel bug de SuiteCRM ») ou de changer une extension existante.
+description: Guide la création ou la modification d'une extension SuiteCRM 8 (dépôt suitecrm-ext-<slug>, créé depuis suitecrm-extension-template), de l'entretien sur le besoin métier jusqu'à la pull request, y compris avec une personne sans connaissance technique, avec ou sans Docker sur son poste. À utiliser quand on demande d'ajouter un comportement à SuiteCRM (« quand on enregistre un compte… », « ajouter un champ… », « corriger tel bug de SuiteCRM ») ou de changer une extension existante.
 ---
 
 # Créer ou modifier une extension SuiteCRM
 
 Principe : **le skill guide, la CI garantit.** Tu fais le travail technique ; la personne
-décrit le besoin et valide le résultat. Les vérifications (`make …`, CI, relecture humaine)
-ne se contournent jamais : si l'une échoue, on corrige, on ne la désactive pas.
+décrit le besoin et valide le résultat. Les vérifications (`make …`, CI, relecture) ne se
+contournent jamais : si l'une échoue, on corrige, on ne la désactive pas.
 
 Ce skill ne couvre que ce qui a été **réellement validé** sur une instance SuiteCRM. Un
-type marqué « pas encore validé » plus bas : explique-le, propose de faire appel à un
+besoin qui ne rentre dans aucun type validé : explique-le, propose de faire appel à un
 développeur, ne l'improvise pas.
+
+Parle en français, en mots métier, sans jargon. Code, commentaires et commits en anglais ;
+textes vus par l'utilisateur en français.
+
+Les détails de chaque étape sont dans `references/` : ne lis que ceux dont le besoin a
+besoin, au moment où tu en as besoin.
+
+## 0. La façon de travailler
+
+Avant tout, établis laquelle des trois s'applique (demande-le si tu ne peux pas le voir) :
+
+| Façon | Qui lance les commandes | Vérifications locales | Essai dans SuiteCRM |
+|---|---|---|---|
+| **1. Claude lance** : Claude Code, ou l'application reliée au poste avec un terminal | toi, sur le poste | toutes (étape 6) | oui (étape 7) |
+| **2. La personne lance** : application Claude, Docker et le devkit sur son poste | la personne, dans Git Bash | toutes, par elle | oui, par elle |
+| **3. Sans Docker** : application Claude seule | toi, dans ton espace de travail | celles sans Docker | non : la CI et le relecteur |
+
+- **Façon 2** : donne **une commande à la fois**, dans un bloc à copier, en disant avant ce
+  qu'elle fait et ce que la personne doit voir. Demande-lui de coller le résultat ; lis-le
+  toi-même plutôt que de lui faire interpréter. Pour écrire des fichiers sur son poste, une
+  commande qui écrit le fichier entier (`cat > fichier <<'EOF'`) vaut mieux qu'une
+  modification à faire à la main.
+- **Façon 3** : clone le dépôt dans ton espace de travail, travaille sur une branche, lance
+  ce qui ne demande pas Docker (étape 6), pousse la branche et ouvre la pull request.
+  Préviens la personne au départ : l'extension ne sera essayée dans SuiteCRM qu'après la
+  pull request, par un développeur ou l'instance de test de la PR.
+- Avant toute commande `make`, le dépôt doit être à jour :
+  `git checkout main && git pull --ff-only && git checkout -b <branche>` (s'arrêter si le
+  `pull` échoue).
 
 ## 1. Comprendre le besoin (entretien)
 
@@ -27,290 +56,81 @@ Pose les questions une par une, en mots simples, et reformule à la fin :
 Écris le besoin en 3 à 5 phrases métier : elles serviront à `extension.json`, au README et
 à la pull request. Fais-les valider avant d'écrire du code.
 
+Avant de créer une extension, regarde si une extension existante fait déjà une partie du
+besoin (les dépôts `suitecrm-ext-*` de david-grosskost sur GitHub, dont les exemples du
+tableau ci-dessous) : la modifier vaut souvent mieux.
+
 ## 2. Trier le besoin
 
-| Le besoin… | Type | Statut |
-|---|---|---|
-| réagit à un événement (enregistrement, connexion, chaque requête) | `logic-hook` | **validé** (upstream-fixes) |
-| ajoute des champs à un module existant (et leur panneau sur la fiche) | `fields` | **validé** (french-company-fields) |
-| contrôle une saisie sur la fiche (message sous le champ, enregistrement refusé) | `logic-hook` + `fields` | **validé** (french-company-validation) |
-| a un réglage modifiable par l'administrateur (page dans Administration) | `ui` | **validé** pour une page d'administration (opportunity-reminders) |
-| change l'affichage de SuiteCRM 8 par un module Angular (format des montants, réglage de l'interface) | `ui` | **validé** (front-customizer) |
-| ajoute un écran, un bouton ou un style à SuiteCRM 8 | `ui` | pas encore validé |
-| tourne à heure fixe | `scheduler` | **validé** (opportunity-reminders) |
-| traduit ou renomme des libellés | `lang` | **validé** avec des champs (french-company-fields) |
+| Le besoin… | Type | À lire | Exemple |
+|---|---|---|---|
+| réagit à un événement (enregistrement, connexion, chaque requête) | `logic-hook` | `references/logic-hook.md` | upstream-fixes |
+| ajoute des champs à un module existant (et leur panneau sur la fiche) | `fields` | `references/champs.md` | french-company-fields |
+| contrôle une saisie sur la fiche (message sous le champ, enregistrement refusé) | `logic-hook` + `fields` | `references/controle-de-saisie.md` | french-company-validation |
+| tourne à heure fixe | `scheduler` | `references/planificateur-et-administration.md` | opportunity-reminders |
+| a un réglage modifiable par l'administrateur (page dans Administration) | `ui` | `references/planificateur-et-administration.md` | opportunity-reminders, login-background |
+| change l'affichage de SuiteCRM 8 (format, style, comportement de l'interface) | `ui` | `references/module-angular.md` | french-currency-format, custom-theme, pwa |
+| traduit ou renomme des libellés | `lang` | `references/champs.md` (libellés) | french-locale |
+| fait quelque chose une fois à l'installation, ou apporte des données de démo | tous | `references/scripts-et-donnees-de-demo.md` | french-company-fields |
 
-**Refuse et renvoie vers un développeur**, en expliquant pourquoi sans jargon :
-modification du cœur de SuiteCRM ou de suitecrm-core, envoi de données hors de SuiteCRM,
-secrets (mots de passe, clés d'API), droits et sécurité, ou un besoin qui ne rentre dans
-aucun type.
+Toute extension s'installe par un paquet du Chargeur de module : lis `references/paquet.md`
+dès qu'elle a un script d'installation ou du PHP au-delà des déclarations (le scanner du
+Chargeur de module refuse certaines fonctions).
+
+**Refuse et renvoie vers un développeur**, en expliquant pourquoi sans jargon : modification
+du cœur de SuiteCRM ou de suitecrm-core, envoi de données hors de SuiteCRM (API externe,
+e-mail automatique à des tiers), secrets (mots de passe, clés d'API), droits et sécurité, ou
+un besoin qui ne rentre dans aucun type.
 
 ## 3. Préparer le dépôt
 
-Le dépôt a été créé depuis `suitecrm-extension-template`, nommé `suitecrm-ext-<slug>`.
+Pour une extension existante : cloner, brancher depuis `main` à jour, passer à l'étape 4.
 
-- **Slug** : minuscules, chiffres et tirets, 40 caractères au plus, **exclusivement en
-  anglais** (`siret-validation`, `french-company-fields`), comme le nom du dépôt et du
+Pour une nouvelle : un développeur (ou la personne, sur GitHub) crée le dépôt depuis
+`suitecrm-extension-template`, nommé `suitecrm-ext-<slug>`.
+
+- **Slug** : minuscules, chiffres et tirets, 40 caractères au plus, **en anglais**
+  (`french-company-validation`, `opportunity-reminders`), comme le nom du dépôt et du
   paquet. Il préfixe tous les fichiers de l'extension.
-- **Réglages GitHub** : un dépôt créé depuis le modèle n'en hérite pas. Un administrateur du
-  dépôt doit, avant le premier merge :
-  - dans Settings → Actions → General, cocher « Allow GitHub Actions to create and approve
-    pull requests » (sinon pas de release) ;
-  - dans Settings → Rules, importer la règle `main` du modèle (PR obligatoire, relecture du
-    code owner, squash uniquement, checks `checks / commit-msg` et `checks / quality`) ;
-  - dans Settings → General, cocher « Automatically delete head branches ».
+- **Réglages GitHub** : un dépôt créé depuis le modèle n'en hérite pas. Le propriétaire les
+  pose avant le premier merge, en suivant `docs/reglages-github.md` du devkit : Actions
+  autorisées à créer des pull requests (sinon pas de release), règle `main` (pull request
+  obligatoire, 0 approbation, checks `checks / commit-msg` et `checks / quality`, squash),
+  suppression automatique des branches fusionnées. Tu ne peux pas les poser : demande-les.
 - **Renommer le paquet sur `main` d'abord**, dans une petite PR à part
   (`chore: rename the package`) : dans `composer.json`, `name` en
   `david-grosskost/suitecrm-ext-<slug>` et `description`. Composer prend le nom du paquet sur
   la branche par défaut : tant que `main` s'appelle encore `suitecrm-ext-exemple`, l'essai
-  dans le core (étape 7) répond « could not be found in any version ». Mettre exactement le
-  même texte que dans la branche de travail, pour éviter un conflit au merge. Le check
+  dans le core répond « could not be found in any version ». Mettre exactement le même texte
+  que dans la branche de travail, pour éviter un conflit au merge. Le check
   `extension@validate` de cette PR échoue (le slug de `extension.json` est encore `exemple`) :
-  c'est attendu, l'administrateur la fusionne en contournant la règle ; la PR suivante remet
-  tout en ordre.
-- Dependabot ouvre aussitôt une PR qui passe le devkit à sa dernière version (composer.json et
-  workflows ensemble) : la fusionner d'abord.
+  c'est attendu, l'administrateur la fusionne en contournant la règle.
+- Dependabot ouvre aussitôt une PR qui passe le devkit à sa dernière version (composer.json
+  et workflows ensemble) : la fusionner d'abord.
 - **Remplacer l'exemple**, dans une branche `feature/<ticket>/<description>` :
   - `extension.json` : `slug`, `name` (français), `description` (le besoin en mots métier,
     20 caractères au moins), `types`, `suitecrm` ;
-  - `composer.json` : `name` en `david-grosskost/suitecrm-ext-<slug>`, `description`, et le
-    namespace des tests dans `autoload-dev` ;
-  - supprimer `legacy/include/exemple/`, `tests/ExempleTest.php` et `CHANGELOG.md` ;
-  - `.release-please-manifest.json` : remettre `"."` à `"0.0.0"` (la première release sera
-    0.1.0, pas la version du modèle) ;
-  - `README.md` : ce que fait l'extension, en mots métier.
+  - `composer.json` : `name`, `description`, et le namespace des tests dans `autoload-dev` ;
+  - supprimer `legacy/include/exemple/`, `tests/ExempleTest.php` et `CHANGELOG.md` (celui du
+    modèle) ; vérifier que `.release-please-manifest.json` vaut `"0.0.0"` (première release
+    en 0.1.0).
 - **Version de SuiteCRM** (`suitecrm`) : `>=8.10 <9` pour un ajout ; pour un correctif de bug
   de SuiteCRM, la seule version mineure vérifiée (`>=8.10 <8.11`), à revérifier à chaque
   nouvelle version.
 
-## 4. Fabriquer : logic hook (validé)
+## 4. Fabriquer
 
-Deux fichiers, et la logique dans le second :
+Lis la ou les références du tri (étape 2) et suis-les. Règles communes :
 
-**La déclaration** : `legacy/Extension/<cible>/Ext/LogicHooks/<slug>.php`, où `<cible>` vaut
-`application` (hooks globaux : `after_entry_point`, `after_login`…) ou `modules/<Module>`
-(hooks d'un module : `before_save`, `after_save`…).
-
-```php
-<?php
-
-// <Ce que fait le hook, en une phrase.>
-
-$hook_version = 1;
-
-/** @var array<string, list<array{int, string, string, string, string}>> $hook_array Set by SuiteCRM */
-$hook_array['<evenement>'][] = [
-    10,
-    '<slug> : <description courte>',
-    'custom/include/<slug>/<Classe>.php',
-    'SuiteCrmExt\<Namespace>\<Classe>',
-    '<methode>',
-];
-```
-
-**La classe** : `legacy/include/<slug>/<Classe>.php`, namespace `SuiteCrmExt\<Namespace>`
-(le slug en PascalCase : `upstream-fixes` → `UpstreamFixes`), `declare(strict_types=1)`,
-`final class`. La méthode du hook ne fait qu'appeler des méthodes statiques pures, que les
-tests appellent directement. **SuiteCRM ne charge que le fichier déclaré dans le hook** :
-les autres classes dont il se sert, ce fichier les charge lui-même
-(`require_once __DIR__ . '/<Autre>.php';`), sinon chaque enregistrement plante. Les tests ne le
-voient pas (l'autoload de Composer charge tout).
-
-**Signature de la méthode : exactement celle avec laquelle SuiteCRM l'appelle.**
-
-- Hook global (`application`, sans enregistrement) :
-  `public function <methode>(string $event, mixed $arguments = null): void`
-- Hook de module (avec enregistrement) :
-  `public function <methode>(\SugarBean $bean, string $event, mixed $arguments = null): void`
-
-## 4 bis. Fabriquer : champs (validé)
-
-Exemple complet : `suitecrm-ext-french-company-fields`. Trois couches :
-
-**Les champs** : `legacy/Extension/modules/<Module>/Ext/Vardefs/<slug>.php`, une entrée
-`$dictionary['<Objet>']['fields']['<champ>']` par champ (`<Objet>` au singulier :
-`Account` pour le module `Accounts`). Préfixer les champs (`fr_siret`) : pas de collision
-avec SuiteCRM ni avec Studio (`_c`). Les colonnes sont créées par la réparation rapide
-(repairDatabase) à l'activation ; un index se déclare dans `$dictionary['<Objet>']['indices']`.
-Annotation obligatoire pour PHPStan :
-
-```php
-/** @var array<string, array<string, array<mixed>>> $dictionary Set by SuiteCRM */
-```
-
-**Les libellés** : `legacy/Extension/modules/<Module>/Ext/Language/{fr_FR,en_us}.<slug>.php`
-(`$mod_strings['LBL_…']`, dont celui du panneau), et les listes déroulantes dans
-`legacy/Extension/application/Ext/Language/{fr_FR,en_us}.<slug>.php`
-(`$app_list_strings['<liste>']`, première clé `''` pour « aucune valeur »). Chacun avec son
-`@var`.
-
-**Le panneau sur la fiche : écrit une fois dans la mise en page de Studio**, par le script
-d'installation (étape 4 ter). Il appartient ensuite à Studio : l'administrateur le déplace,
-le renomme ou le supprime, il n'est jamais remis. Ne pas l'ajouter à la volée (couche
-SuiteCRM 8, `ViewDefinitionMapper`) : Studio ne pourrait plus ni le retirer ni le
-renommer, et des champs déplacés apparaîtraient deux fois.
-
-- La logique dans une classe sans dépendance à SuiteCRM, `legacy/include/<slug>/`, testée
-  seule (exemple : `StudioPanel`). Elle travaille sur le format de Studio pendant l'édition
-  (`GridLayoutMetaDataParser::$_viewdefs`) : panneaux → lignes → noms de champs.
-- Une case vide se note **`(filler)`** : `(empty)` est supprimé à l'enregistrement, et le
-  champ voisin prend alors toute la ligne.
-- Clé du panneau en majuscules (`LBL_FR_COMPANY_PANEL`), qui est aussi la clé de son titre
-  dans les libellés du module.
-- **Fiche en onglets** (`templateMeta.tabDefs` non vide, comme les Comptes) : y ajouter
-  `['newTab' => true, 'panelDefault' => 'expanded']` pour le panneau. Sans `tabDefs`, ne rien
-  y mettre : tous les panneaux s'affichent, et un onglet masquerait les autres.
-- Ne rien ajouter si le panneau ou un de ses champs est déjà dans la mise en page (placé par
-  Studio).
-
-## 4 ter. Scripts d'installation et données de démo (validé)
-
-Lancés par le paquet du Chargeur de module (7 bis), dans SuiteCRM, en administrateur, le
-dossier courant étant `public/legacy` :
-
-- **`database/install.php`** : une fois, après la réparation rapide de l'installation. Pour
-  ce qui se fait une fois dans SuiteCRM : un panneau dans une mise en page de Studio, par
-  exemple (`ParserFactory::getParser(MB_DETAILVIEW, '<Module>')`, modifier `$_viewdefs`,
-  `handleSave(false)`). Une version suivante de l'extension ne le relance pas : le paquet
-  note l'installation en base (table `config`, catégorie `extension_installed`).
-- **`database/uninstall.php`** : à la désinstallation, avant que les fichiers soient retirés
-  (SuiteCRM connaît encore les champs). Défaire ce qu'a fait l'installation, sans rien
-  supprimer d'autre : retirer les champs de la mise en page où qu'ils soient, le panneau s'il
-  est vide. Réinstallée, l'extension s'installe de nouveau. Les colonnes et leurs données
-  restent en base.
-- Les deux tournent **dans une fonction** : pas de variable attendue d'ailleurs, `global`
-  pour celles de SuiteCRM (`$current_user`, `$sugar_config`), `return` pour s'arrêter.
-- Un script **renvoie son message** (`return 'mon-slug : panneau ajouté.';`, `return` aussi
-  pour s'arrêter plus tôt) et n'affiche rien : `echo` est refusé par le scanner du Chargeur de
-  module (7 bis). SuiteCRM le note dans son journal.
-- **`database/seeders/<slug>/seeders.php`** : renvoie la liste des seeders de l'extension
-  (contrat dans le `database/README.md` du core), chargés par `make db@seed` quand
-  l'extension est installée. Pour compléter les comptes d'un autre seeder : `dependsOn()` le
-  nomme, et `$seed->update($bean, $champs)` n'écrit **que les champs vides** (une valeur
-  saisie en démo reste).
-- Charger ses propres classes par `__DIR__` (`__DIR__ . '/../legacy/include/<slug>/…'`), le
-  code de SuiteCRM par `getcwd()` (`getcwd() . '/modules/ModuleBuilder/…'`) : PHPStan
-  n'a pas SuiteCRM, un chemin écrit en dur échoue à l'analyse.
-- Ce que PHPStan ne connaît pas (Studio, seeders du core) : `tests/stubs/suitecrm.stub`,
-  dans `scanFiles` de `phpstan.dist.neon`, avec `database` dans `paths`. Dans
-  `composer.json`, `autoload-dev` fait pointer `SuiteCrmExt\<Namespace>\` vers
-  `legacy/include/<slug>/` (puis `make composer@install` pour régénérer l'autoload).
-
-## 4 quater. Contrôler une saisie sur la fiche (validé)
-
-Exemple complet : `suitecrm-ext-french-company-validation`. Deux niveaux, mêmes règles
-(fonctions pures dans `legacy/include/<slug>/`) :
-
-- **Pendant la saisie (SuiteCRM 8)** : un `asyncValidator` sur le champ, que la fiche appelle
-  avant d'enregistrer ; tant qu'il répond une erreur, la fiche refuse l'enregistrement et
-  affiche le message sous le champ.
-  - L'ajouter par un `FieldDefinitionMapperInterface` (`backend/FieldDefinitions/`,
-    `getModule()` `'default'`, module reconnu par `strtolower($definition->getId())`), qui
-    ajoute `asyncValidators['<slug>'] = ['key' => '<processus>', 'params' => […]]` aux champs
-    voulus. **Pas dans les fichiers de champs** (`Ext/Vardefs`) : l'ordre de fusion des
-    extensions n'est pas garanti, l'ajout est perdu.
-  - Le processus : un `ProcessHandlerInterface` (`backend/Process/`, `getProcessType()` = la
-    clé). Il reçoit `options['value']` et `options['params']` ; en erreur :
-    `setStatus('error')` et `setData(['errors' => ['startLabelKey' => '<LBL_…>']])`.
-  - **Le message dans `$app_strings`** (`legacy/Extension/application/Ext/Language/`) : la
-    fiche ne le cherche que là, pas dans les libellés du module (sinon, message vide).
-  - Classes SuiteCRM 8 enregistrées et taguées par le core, sans fichier de services.
-- **À chaque enregistrement (toute voie : import, API, workflow)** : un hook `before_save`
-  qui nettoie la saisie (`$bean->{$champ} = …`) et refuse en levant une exception. SuiteCRM 8
-  n'affiche alors qu'un message générique (« Une erreur s'est produite… ») : c'est le dernier
-  rempart, la fiche a déjà prévenu l'utilisateur.
-- Une extension qui complète celle d'une autre (ici les champs de french-company-fields) ne
-  fait rien quand l'autre n'est pas active (champs absents) : le dire dans le README.
-
-## 4 quinquies. Tâche planifiée et page d'administration (validé)
-
-Exemple complet : `suitecrm-ext-opportunity-reminders`.
-
-**La tâche planifiée** : `legacy/Extension/modules/Schedulers/Ext/ScheduledTasks/<slug>.php`
-ajoute le nom d'une fonction à `$job_strings` (`/** @var list<string> $job_strings */`) et
-la déclare (`if (!function_exists(…))`, signature `function <nom>(mixed $job = null): bool`).
-La fonction charge sa classe (`require_once getcwd() . '/custom/include/<slug>/<Classe>.php'`)
-et renvoie `true` (succès dans `job_queue`). Son nom dans la liste « Tâche » du planificateur :
-`$mod_strings['LBL_<NOM EN MAJUSCULES>']` dans
-`legacy/Extension/modules/Schedulers/Ext/Language/`. Le cron du core
-(`bin/console schedulers:run`, chaque minute) l'appelle en administrateur.
-
-- **La ligne du planificateur** (Administration → Planificateur) : créée par
-  `database/install.php` (bean `Schedulers` : `job` = `function::<nom>`, `job_interval`
-  `minute::heure::jour::mois::jour de semaine` à l'heure de l'administrateur, `status`
-  `Active`, **`catch_up` `0`**), supprimée par `database/uninstall.php` (`mark_deleted`).
-  Ne rien créer si une ligne non supprimée a déjà ce `job` : elle appartient à
-  l'administrateur, qui peut changer l'horaire ou la rendre inactive.
-- Lire des lignes en base : `$db->query()` puis `$db->fetchByAssoc($result, false)` (valeurs
-  telles que stockées, déjà encodées en HTML : `d&#039;essais`).
-
-**Un réglage** : dans la table des réglages de SuiteCRM, sans fichier de configuration.
-`BeanFactory::newBean('Administration')`, `retrieveSettings('<categorie>', true)` puis
-`$admin->settings['<categorie>_<cle>']` pour lire, `saveSetting('<categorie>', '<cle>', $valeur)`
-pour écrire. Toujours une valeur par défaut quand rien de valide n'est enregistré.
-
-**La page d'administration** (legacy, s'affiche dans SuiteCRM 8) :
-
-- l'entrée : `legacy/Extension/modules/Administration/Ext/Administration/<slug>.php` ajoute un
-  groupe à `$admin_group_header` (`[titre, '', false, $admin_option_defs, description, icône]`,
-  lien `./index.php?module=Administration&action=<Action>`) ; libellés dans
-  `legacy/Extension/modules/Administration/Ext/Language/` ;
-- l'action : `legacy/Extension/modules/Administration/Ext/ActionFileMap/<slug>.php`
-  (`$action_file_map['<action en minuscules>'] = 'custom/include/<slug>/<Page>.php'`) : le
-  contrôleur charge ce fichier, `$mod_strings` contenant les libellés d'Administration ;
-- le fichier vérifie `is_admin($current_user)` (sinon `sugar_die`), traite le formulaire, puis
-  affiche dans la page de SuiteCRM (en-tête, styles) par une sous-classe de `SugarView` dont
-  `display()` écrit le HTML : `new <Vue>(…)`, `->init()`, `->process()`. Charger
-  `getcwd() . '/include/MVC/View/SugarView.php'` dans ce fichier, **pas** dans celui de la
-  classe ;
-- la logique (ce que fait le formulaire, le HTML échappé) dans une classe pure, testée.
-
-Un bouton « lancer maintenant » sur la page sert en démo : on n'attend pas l'heure prévue.
-
-## 4 sexies. Module Angular de SuiteCRM 8 (validé)
-
-Exemple complet : `suitecrm-ext-front-customizer`. SuiteCRM 8 charge au démarrage de
-l'interface le module Angular déjà compilé d'une extension (module federation) : **le front de
-SuiteCRM n'est jamais recompilé**, ni dans le core ni sur le serveur.
-
-- **`app/`** : les sources, copie de `extensions/defaultExt/app` de SuiteCRM-Core (la version
-  de l'image), `defaultExt` renommé partout en `<Nom>`, le slug en PascalCase
-  (`front-customizer` → `FrontCustomizer`). Le code va dans `app/src/extension.module.ts`.
-- **`public/`** : le module compilé, **commité**. `make front@build` le construit (Docker,
-  Node 22, sources de SuiteCRM gardées dans le volume `suitecrm-front-<version>` : quelques
-  minutes la première fois, moins d'une ensuite). La CI (`make front@check`) reconstruit et
-  échoue si `public/` ne correspond pas à `app/` : reconstruire et commiter `public/` à chaque
-  changement d'`app/`. `app/` et `public/` vont ensemble (`extension@validate`).
-- **`config/extension.php`** : déclare le module à SuiteCRM. Ajouter une entrée
-  `$extensions['<Nom>']` au paramètre `extensions` du conteneur, avec
-  `'remoteEntry' => '../extensions/<Nom>/remoteEntry.js'`, `'remoteName' => '<Nom>'`,
-  `'enabled' => true`. Le core copie `public/` dans `extensions/<Nom>/public/`, et SuiteCRM le
-  recopie dans `public/extensions/<Nom>/` en reconstruisant son cache.
-- **Le travail se fait dans le constructeur de `ExtensionModule`** : SuiteCRM 8.10 n'appelle
-  jamais son `init()`. Les services de SuiteCRM s'injectent par le constructeur
-  (`import {…} from 'core'`, bibliothèque partagée). Un `console.info('<slug> : chargé…')`
-  permet de vérifier le chargement dans la console du navigateur.
-- Test PHP : `config/extension.php` déclare bien le module (`tests/ExtensionConfigTest.php`,
-  avec un stub du `Container` de Symfony dans `tests/stubs/`).
-- **Limite** : les pages de l'ancienne interface affichées dans SuiteCRM 8 (dashlets de
-  l'accueil, pages d'administration) sont faites par le legacy en PHP : le module Angular ne
-  les change pas. Pour l'affichage d'un type de champ, voir la surcharge ci-dessous ; sinon,
-  le dire dans le README.
-
-**Surcharger l'affichage legacy d'un type de champ** (exemple : `suitecrm-ext-french-currency-format`,
-montants des dashlets) : SuiteCRM charge
-`custom/include/SugarFields/Fields/<Type>/SugarField<Type>.php` à la place du sien et utilise
-la classe `CustomSugarField<Type>` si elle existe. Dans l'extension :
-`legacy/include/SugarFields/Fields/<Type>/SugarField<Type>.php` (seul chemin hors du slug
-qu'accepte `extension@validate`), qui charge la classe de SuiteCRM
-(`require_once getcwd() . '/include/SugarFields/Fields/<Type>/SugarField<Type>.php'`) et sa
-logique (`require_once __DIR__ . '/../../../<slug>/<Classe>.php'`), puis déclare
-`class CustomSugarField<Type> extends SugarField<Type>` qui ne fait qu'appeler cette logique
-pure, testée. Une seule extension par type : le core refuse qu'une autre écrase le fichier.
-La classe de SuiteCRM va dans `tests/stubs/suitecrm.stub` pour PHPStan.
-
-Essai local (étape 7) : ouvrir la console du navigateur après Ctrl+F5 et vérifier que
-`/extensions/<Nom>/remoteEntry.js` répond 200.
+- **Le slug dans chaque nom de fichier** de `legacy/Extension/` ; toute la logique dans des
+  classes de `legacy/include/<slug>/`, sans dépendance à SuiteCRM, testables seules. Les
+  fichiers de déclaration ne font que déclarer.
+- **Jamais rien hors des emplacements prévus** (tableau « Où mettre quoi » du `CLAUDE.md` du
+  dépôt) : `make extension@validate` le refuse.
+- Les fichiers de `legacy/Extension/` ne contiennent que des tableaux : SuiteCRM les charge
+  parfois plusieurs fois, par `require` et non `require_once`. Jamais de fonction ni de
+  classe déclarée sans `if (!function_exists(…))`.
+- Chaque libellé dans les deux langues (`fr_FR` et `en_us`), avec son `@var` pour PHPStan.
 
 ## 5. Tester
 
@@ -323,207 +143,90 @@ Dans `tests/<Classe>Test.php`, namespace `SuiteCrmExt\<Namespace>\Tests` :
 - pour des champs : les définitions (vardefs, libellés dans les deux langues, chaque option
   de liste traduite) et le panneau dans la mise en page de Studio : ajout avec et sans
   onglets, rien si un champ est déjà placé, retrait où que Studio ait mis les champs ;
-- pour un seeder : ce qu'il calcule (fonctions pures), et qu'il ne remplace jamais une valeur.
+- pour un seeder : ce qu'il calcule (fonctions pures), et qu'il ne remplace jamais une
+  valeur.
 
-## 6. Vérifier (local)
+## 6. Vérifier
+
+**Façons 1 et 2**, dans le dossier de l'extension :
 
 ```bash
 make extension@validate && make quality@lint && make quality@stan && make test@unit
 ```
 
-Avec un module Angular (`app/`), ajouter `make front@check` (il reconstruit `public/`).
+Avec un module Angular (`app/`), ajouter `make front@check`. Avec un script d'installation
+ou du PHP chargé par SuiteCRM : `make package@build && make package@scan`.
 
-Explique chaque échec en une phrase simple, corrige, relance. Ne désactive jamais une règle
-et n'ajoute jamais d'exception pour faire passer une vérification : demande à un
-développeur si tu bloques.
+**Façon 3**, dans ton espace de travail (PHP y est, Docker non) :
 
-## 7. Essayer dans SuiteCRM (local)
+- le format : cloner `https://github.com/david-grosskost/suitecrm-devkit` à côté et lancer
+  `php ../suitecrm-devkit/.make/scripts/extension/validate.php` depuis le dossier de
+  l'extension ;
+- la syntaxe : `php -l` sur chaque fichier PHP modifié ;
+- les tests, le style et PHPStan, si Composer peut installer les dépendances
+  (`composer install`) ; sinon, la CI de la pull request les fera : dis-le.
 
-Dans le dossier de suitecrm-core, sur sa propre branche, **sans commiter** :
+Explique chaque échec en une phrase simple, corrige, relance. N'ajoute jamais d'exception
+pour faire passer une vérification : demande à un développeur si tu bloques. Les pièges
+connus sont dans `references/pieges.md` : lis-le dès qu'une vérification échoue de façon
+inattendue.
 
-1. Dans `composer.json`, ajouter le dépôt dans `repositories`
-   (`{ "type": "vcs", "url": "https://github.com/david-grosskost/suitecrm-ext-<slug>", "no-api": true }`)
-   et l'extension dans `require` (`"david-grosskost/suitecrm-ext-<slug>": "dev-<branche>"`),
-   **sans virgule après la dernière ligne** ; pousser la branche de l'extension avant.
-2. `make composer@update PACKAGES=david-grosskost/suitecrm-ext-<slug>`
-3. `make app@start` : l'image est refabriquée, et le catalogue d'extensions avec. Puis
-   `make extensions@install SLUGS=<slug>`, qui affiche la réparation rapide et le message
-   du script d'installation s'il y en a un. `make extensions@list` doit alors montrer
-   l'extension **installée** ; Administration → Chargeur de module la montre aussi.
-4. Refaire l'exemple concret de l'entretien dans https://suitecrm-core.dev.localhost avec
-   la personne (recharger avec Ctrl+F5). Pour des champs, vérifier aussi les colonnes :
-   `MSYS_NO_PATHCONV=1 docker exec suitecrm-core-db sh -c 'mariadb -u"$MARIADB_USER" -p"$MARIADB_PASSWORD" "$MARIADB_DATABASE" -e "SHOW COLUMNS FROM <table> LIKE \"<prefixe>_%\""'`.
-   Sous Git Bash, toute commande `docker` avec un chemin commençant par `/` prend le
-   préfixe `MSYS_NO_PATHCONV=1`.
-5. Annuler : `make extensions@uninstall SLUGS=<slug>`, puis
-   `git checkout -- composer.json composer.lock && make composer@install && make app@start`.
+## 7. Essayer dans SuiteCRM
 
-**Après chaque correction du code de l'extension**, refaire
-`make composer@update PACKAGES=…` puis `make app@start` ne suffit pas : une extension déjà
-installée n'est reprise que si le catalogue apporte un **numéro de version plus récent**, et
-une branche de travail garde le même. Désinstaller puis réinstaller
-(`make extensions@uninstall SLUGS=<slug> && make extensions@install SLUGS=<slug>`).
+Façons 1 et 2 seulement : lance le skill `essayer-extension` (ou l'agent `testeur` dans
+Claude Code), qui suit `references/essai-local.md` et rend un compte rendu. Il refait
+l'exemple concret de l'entretien avec la personne, puis le test de régression
+(`make test@regression` dans suitecrm-core), qui parcourt les écrans principaux avec toutes
+les extensions installées.
 
-Si le conteneur redémarre en boucle après l'installation, c'est presque toujours une erreur
-fatale PHP dans le hook (signature, fichier introuvable) : `make app@logs`.
+Façon 3 : sauter, et l'écrire dans la pull request (« pas essayée dans SuiteCRM »).
 
-## 7 bis. Paquet du Chargeur de module
+## 8. Documenter
 
-Le paquet est **la seule façon dont une extension s'installe** : à la main sur n'importe quel
-SuiteCRM 8 (Administration → Chargeur de module), ou par l'image de suitecrm-core, qui l'y
-dépose et l'installe pour l'instance. `make package@build` fabrique le paquet dans
-`build/<slug>-<version>.zip` (jamais commité) ; la CI le fabrique à chaque PR, et la release
-le joint à la version sur GitHub.
+Le `README.md` et `docs/` suivent le plan du modèle (`suitecrm-extension-template`) :
 
-- Il reprend les mêmes dossiers que l'image : `backend/`, `config/`, `public/` vont dans
-  `extensions/<Nom>/`, `legacy/…` dans `custom/…`. Rien à déclarer : un fichier hors de ces
-  dossiers n'est pas dans le paquet.
-- Après la copie, le paquet lance la réparation rapide (le Chargeur de module ne crée pas
-  les colonnes des nouveaux champs), puis `database/install.php`. `database/uninstall.php`
-  tourne avant la désinstallation. Les seeders restent hors du paquet.
-- **Mise à jour** (une version plus récente installée par-dessus) : le Chargeur de module
-  ne désinstalle pas, il recopie les fichiers et relance la réparation rapide ;
-  `database/install.php` **ne tourne pas à nouveau** (noté en base, table `config`,
-  catégorie `extension_installed`), pour ne pas défaire ce que l'administrateur a changé
-  depuis. La désinstallation efface cette note. Un changement de données à apporter par
-  une nouvelle version ne passe donc pas par `install.php`. SuiteCRM ne reconnaît pas la
-  mise à jour d'une version 0.x (bug de `UpgradeHistory::determineIfUpgrade`) : il
-  l'installe comme un nouveau paquet ; le script généré retire alors la ligne de
-  l'ancienne version de la liste des paquets installés. Le core fait cette mise à jour tout
-  seul au démarrage de l'instance, pour les extensions déjà installées dont l'image apporte
-  une version plus récente.
-- **Le scanner du Chargeur de module** (désactivé par défaut dans SuiteCRM, mais certains
-  hébergeurs l'activent) refuse tout le paquet pour un seul appel interdit, dans `legacy/`,
-  `backend/`, `config/` ou `database/`, tests exclus. Les plus courants : les fonctions à
-  callback (`array_map`, `array_filter`, `usort`, `call_user_func`…) → une boucle ; les appels
-  `$fonction()` → une méthode ; `echo`, `exit`/`die` ; et les fonctions de fichiers
-  (`file_get_contents`, `file_exists`, `is_file`, `mkdir`, `copy`, `rename`, `unlink`,
-  `getimagesize`, `readfile`…) → passer par les classes de SuiteCRM. La liste complète est
-  dans `ModuleInstall/ModuleScanner.php` de SuiteCRM. `make package@scan` (après
-  `make package@build`) passe le paquet au vrai scanner, comme la CI à chaque PR.
-- Le paquet n'accepte que la version mineure de SuiteCRM du module Angular (8.10.x).
+- `README.md` : la fiche (ce que fait l'extension, types, version de SuiteCRM), comment
+  l'installer, le tableau des pages de `docs/` ;
+- `docs/utilisation.md` : pour l'utilisateur et l'administrateur, en mots métier, avec
+  l'exemple de l'entretien ;
+- `docs/fonctionnement.md` : comment elle s'y prend, ce qu'elle ne fait pas, ses limites ;
+- `docs/developpement.md` : les fichiers, les tests, comment l'essayer ;
+- `docs/depannage.md` si des problèmes connus existent.
 
-Essai : dans https://suitecrm-core.dev.localhost, l'extension désinstallée
-(`make extensions@uninstall SLUGS=<slug>`), Administration → Chargeur de module → Installer
-sur sa ligne, que l'image y a déposée ; refaire l'exemple concret ; puis Désinstaller et
-vérifier que tout est revenu comme avant. Pour s'assurer qu'elle s'installe aussi **sans
-l'image**, téléverser le zip de `make package@build` sur un SuiteCRM 8 ordinaire.
+Toute pull request qui change le comportement met ces pages à jour : ce qu'elles disent doit
+rester vrai. Les liens entre pages se vérifient (fichier existant, ancre existante).
 
-## 8. Pull request
+## 9. Pull request
 
-- Commit en anglais, Conventional Commits : `feat: <ce que fait l'extension>`
-  (`fix: …` pour corriger). Le titre de la PR est le même : il devient le message sur `main`.
-  GitHub propose le message du commit quand la branche n'en a qu'un, sinon le nom de la
-  branche (refusé par `checks / commit-msg`). **`make git@pr`** pousse la branche et ouvre la PR
-  avec le titre du premier commit (ou affiche l'adresse de celle déjà ouverte). Une fois par
-  poste : `make git@gh` (installe gh dans `.tools/`), puis la personne se connecte elle-même
-  avec `.tools/bin/gh auth login` : jamais de jeton dans la conversation.
-- Description de la PR : le besoin en mots métier, comment il a été vérifié (tests, essai
-  local), et ce qu'il reste à faire.
-- Un développeur relit avant le merge (squash). Après le merge, la PR de release ouvre la
-  version ; la mergée pose le tag.
-- Ensuite seulement, l'extension peut entrer dans le catalogue de suitecrm-core ou d'un projet
-  client (`repositories`, `require` avec `^<version>`) : c'est le travail d'un développeur. La
-  branche de travail est supprimée au merge : `dev-<branche>` ne résout plus, passer à
-  `^<version>`. Y entrer la rend **disponible** sur toutes les instances, pas installée : une
+- Commit en anglais, Conventional Commits : `feat: <ce que fait l'extension>` (`fix: …` pour
+  corriger, `docs: …` pour la documentation seule). Le titre de la PR est le même et devient
+  le message sur `main` : **65 caractères au plus** (`checks / commit-msg` refuse au-delà de
+  72, et GitHub ajoute ` (#NN)`).
+- Enchaîner vérifications et commit sur une seule ligne avec `&&` : un commit ne part pas
+  après un échec.
+- **`make git@pr`** pousse la branche et ouvre la PR avec le titre du premier commit. Une fois
+  par poste : `make git@gh`, puis la personne se connecte elle-même avec
+  `.tools/bin/gh auth login` : jamais de jeton dans la conversation. Sans gh : pousser, puis
+  ouvrir la PR sur GitHub par le lien qu'affiche `git push`.
+- Description : le besoin en mots métier, comment il a été vérifié (tests, essai local ou
+  « pas essayée dans SuiteCRM »), ce qu'il reste à faire.
+- **Relecture** : lance le skill `relire-extension` (ou l'agent `relecteur` dans Claude
+  Code) sur la pull request, qui la relit sans avoir vu sa fabrication. Corrige ce qu'il
+  signale de bloquant, puis un développeur relit et fusionne (squash).
+- Après le merge, la PR de release (« chore(main): release x.y.z ») ouvre la version ; sa
+  fusion pose le tag. Elle demande parfois **Approve workflows to run** avant que sa CI ne
+  tourne (`references/pieges.md`).
+- Ensuite seulement, l'extension peut entrer dans le catalogue de suitecrm-core ou d'un
+  projet client (`repositories`, `require` avec `^<version>`) : c'est le travail d'un
+  développeur. Y entrer la rend **disponible** sur toutes les instances, pas installée : une
   extension métier s'installe instance par instance (Chargeur de module, ou
-  `make extensions@install`). Seules les extensions obligatoires (`required-extensions` dans
-  le `composer.json` du core) sont installées d'office à la création d'une instance.
+  `make extensions@install SLUGS=<slug>`). Seules les extensions obligatoires
+  (`required-extensions` dans le `composer.json` du core) sont installées d'office.
 - Déployer une instance (workflow Deploy, Run workflow) : choisir **le tag** de la release
   dans « Use workflow from ». Avec `main`, le déploiement est ignoré (« Skipped »).
 
-## Pièges déjà rencontrés
+## Après coup
 
-- PHPStan « Cannot access an offset on mixed » sur `$hook_array` : il manque l'annotation
-  `@var` de l'étape 4.
-- Hook global déclaré avec `array $arguments` : SuiteCRM passe `null`, erreur fatale sur
-  **chaque page** et conteneur qui redémarre en boucle. Toujours `mixed $arguments = null`.
-- Première release en 0.2.0 au lieu de 0.1.0 : `.release-please-manifest.json` pas remis à
-  `0.0.0`.
-- Release qui échoue (« GitHub Actions is not permitted to create pull requests ») :
-  réglage Actions du dépôt pas fait (étape 3).
-- Merge impossible alors que tout est vert : la relecture obligatoire ; l'auteur ne peut pas
-  s'approuver lui-même, un administrateur merge en contournant la règle.
-- Essai dans le core : « could not be found in any version » alors que la branche est
-  poussée : le paquet porte encore le nom du modèle sur `main` (étape 3).
-- `/docker-entrypoint.sh: exec: update: not found` : `composer.json` invalide (virgule
-  finale) ; le vérifier avec
-  `MSYS_NO_PATHCONV=1 docker run --rm -v "$PWD":/app -w /app composer:2 composer validate --no-check-publish`.
-- Champs créés mais panneau absent de la fiche : fiche en onglets, panneau absent de
-  `tabDefs` (étape 4 bis). Vérifier ce que renvoie l'API avant de chercher ailleurs.
-- Un champ du panneau prend toute la ligne : case vide notée `(empty)` au lieu de
-  `(filler)`.
-- `Class "SuiteCrmExt\…" not found` dans les tests après un changement d'`autoload-dev` :
-  autoload pas régénéré, `make composer@install`.
-- Un commit parti alors qu'une vérification a échoué : enchaîner vérifications et commit sur
-  une seule ligne, avec `&&`.
-- Studio dans le navigateur : le modifier depuis SuiteCRM (Administration → Studio) ; un
-  redémarrage de l'app déconnecte les sessions.
-- PHPStan « Cannot access an offset on mixed » sur `$dictionary`, `$mod_strings` ou
-  `$app_list_strings` : il manque le `@var` qui décrit chaque niveau du tableau.
-- Contrôle de saisie qui bloque la fiche sans message : libellé dans `$mod_strings` au lieu
-  de `$app_strings`. Qui ne se déclenche pas : `asyncValidators` mis dans `Ext/Vardefs`
-  (étape 4 quater) ; vérifier le `fieldDefinition` que renvoie l'API.
-- « Une erreur s'est produite lors de l'enregistrement » sur toute sauvegarde : le hook
-  utilise une classe que son fichier ne charge pas (étape 4).
-- Tâche planifiée qui tourne dès l'activation, et non à l'heure prévue : `catch_up` à `1`
-  (l'heure du jour est déjà passée, SuiteCRM la rattrape). Mettre `0` (étape 4 quinquies).
-- PHPStan « Call to an undefined method » sur une méthode de SuiteCRM (ex. `fetchByAssoc`,
-  `mark_deleted`) : le stub du devkit ne la déclare pas. L'y ajouter avec la signature exacte de
-  SuiteCRM, publier une version du devkit (tag), et demander cette version dans le
-  `composer.json` de l'extension (`^0.21.3`) ; jamais d'exception dans PHPStan. Une classe
-  absente du stub du devkit (ex. `SugarView`) peut aller dans `tests/stubs/` de l'extension.
-- Un `require_once` d'un fichier de SuiteCRM en tête d'un fichier de classe : PHPStan l'exécute
-  en chargeant la classe et échoue. Le mettre dans le script qui utilise la classe.
-- Pour essayer une tâche planifiée sans attendre : passer son `job_interval` à
-  `*::*::*::*::*` en base, attendre deux minutes, lire `job_queue` (`status` `done`,
-  `resolution` `success`), puis remettre l'horaire. Garder le réglage réel pendant l'essai : un
-  délai abaissé (1 jour) relance aussi tout le volume généré.
-- Module Angular chargé (`remoteEntry.js` en 200) mais sans effet : le code est dans `init()`,
-  que SuiteCRM 8.10 n'appelle pas. Le mettre dans le constructeur (étape 4 sexies).
-- Montants « 67 300 00 € » (virgule décimale perdue) : locale `fr-FR` donnée au
-  `CurrencyFormatter`. SuiteCRM remplace lui-même les séparateurs par ceux de l'utilisateur ;
-  partir de la locale `en` et ne changer que le motif (`#,##0.00 ¤`).
-- `make front@check` en échec alors que rien n'a changé : `public/` construit hors de
-  `make front@build` (autre chemin, autre version de SuiteCRM). Le résultat dépend du chemin
-  des sources : toujours construire avec `make front@build`.
-- `front@build` : « angular.json introuvable » avant `build:core` : lancer
-  `yarn merge-angular-json` d'abord (le script du devkit le fait).
-- Sans `make git@pr` (gh pas connecté) : pousser la branche, puis ouvrir la PR sur GitHub
-  (lien affiché par `git push`) en recopiant le titre du commit quand la branche en a plusieurs.
-- Seeder qui écrit une date de modification passée (`date_modified`) : `save()` la remet à
-  maintenant. Mettre `$bean->update_date_modified = false` avant `$seed->update(…)`, plutôt
-  qu'un `UPDATE` SQL que le compte des enregistrements ne voit pas (devkit 0.23 pour PHPStan).
-- Menu des modules vide dans toute l'interface après l'installation d'une extension : elle
-  ajoute un groupe d'administration (`$admin_group_header[]` dans
-  `modules/Administration/Ext/Administration/`). SuiteCRM 8 construit son menu à partir de
-  cette structure et n'en revient pas. Déclarer l'entrée **sans** créer de groupe ne casse
-  rien mais ne l'affiche nulle part : tant que ce n'est pas résolu, une page
-  d'administration s'atteint par son adresse (`index.php?entryPoint=…`). Ne jamais
-  **affecter** `$admin_option_defs` non plus : le tableau est partagé par toutes les
-  extensions, l'affectation efface celles déclarées avant.
-- Extension mise à jour, rien ne change dans le navigateur : `remoteEntry.js` est le seul
-  fichier du module fédéré **sans empreinte dans son nom**, et Apache ne pose aucun
-  `Cache-Control`. Le navigateur sert l'ancienne table des matières, donc l'ancien code.
-  Ctrl+Shift+R pour essayer ; distinguer le cache du paquet en comparant
-  `fetch(url)` et `fetch(url, {cache:'reload'})`.
-- Icône ou élément ajouté à une entrée de menu qui disparaît à chaque changement d'écran :
-  Angular **recrée tout le menu** (une entrée sur trente survit). Faire peindre par la
-  feuille de style plutôt qu'ajouter : rien dans le balisage ne nomme le module, mais
-  `:has(a[href*="return_module=X&"])` atteint les adresses de son sous-menu, et une règle
-  par module s'applique dès que SuiteCRM dessine l'entrée.
-- Libellé périmé sur une entrée de menu (le nom d'un module, le sous-menu d'un autre) :
-  la décoration a vidé le lien pour y mettre son contenu. Angular réutilise ces éléments
-  pour d'autres modules ; **ajouter autour** de ce qu'il écrit, jamais détruire, et comparer
-  à chaque passe le module que l'entrée désigne pour refaire la décoration quand il change.
-- Masquer un libellé avec `opacity: 0` lui laisse sa largeur : un centrage le compte encore.
-  Le sortir du flux (`display: none`) quand la place manque.
-- `repair.php` ou tout script PHP lancé sans `-u www-data` : le cache Symfony est recréé en
-  root, Apache ne peut plus l'écrire, l'instance répond 500 **sans rien journaliser**.
-  Vérifier avec `ls -ld cache cache/prod`, réparer avec un `chown -R www-data:www-data`.
-- SuiteCRM n'affiche que huit modules dans son menu et replie le reste dans « Options », qui
-  ne porte pas les sous-menus. Deux plafonds à lever : `default_max_tabs` côté historique
-  (par `Configurator::handleOverride()` à l'installation) et `themes.navigation_tab_limits`
-  côté SuiteCRM 8. Le second se surcharge **depuis l'extension** : SuiteCRM importe de
-  lui-même `../extensions/*/config/services/*.yaml` et `config/packages/*.yaml`, donc rien
-  du cœur n'est touché.
+Un piège rencontré, un type nouveau validé : ajoute-le à `references/` (dans le devkit,
+`plugins/suitecrm-extensions/`) dans une pull request, et monte la version du plugin. Le
+skill ne vaut que ce qu'il a appris.
