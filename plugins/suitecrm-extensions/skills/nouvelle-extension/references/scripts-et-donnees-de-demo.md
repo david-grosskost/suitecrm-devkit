@@ -10,6 +10,10 @@ dossier courant étant `public/legacy` :
   exemple (`ParserFactory::getParser(MB_DETAILVIEW, '<Module>')`, modifier `$_viewdefs`,
   `handleSave(false)`). Une version suivante de l'extension ne le relance pas : le paquet
   note l'installation en base (table `config`, catégorie `extension_installed`).
+- **Modifier des données existantes** (corriger les fiches déjà saisies) dans `install.php`
+  seulement si la personne l'a demandé à l'entretien, en sachant que c'est définitif. Ne
+  toucher que les lignes à changer, renvoyer le nombre de fiches modifiées dans le message,
+  et le dire dans le README et `docs/utilisation.md`.
 - **`database/uninstall.php`** : à la désinstallation, avant que les fichiers soient retirés
   (SuiteCRM connaît encore les champs). Défaire ce qu'a fait l'installation, sans rien
   supprimer d'autre : retirer les champs de la mise en page où qu'ils soient, le panneau s'il

@@ -44,7 +44,9 @@ plus, ni moins ? Un comportement non décrit est un défaut, même utile.
 - appel refusé par le scanner du Chargeur de module (`array_map`, `array_filter`, `echo`,
   fonctions de fichiers…) dans `legacy/`, `backend/`, `config/` ou `database/` ;
 - `install.php` qui écrase ce que l'administrateur a pu changer, ou `uninstall.php` qui
-  supprime plus que ce que l'installation a fait.
+  supprime plus que ce que l'installation a fait ;
+- `install.php` qui modifie des données déjà saisies sans que la documentation dise que
+  c'est demandé et définitif (à faire confirmer par la personne qui a exprimé le besoin).
 
 **La qualité** (à corriger) :
 - logique dans les fichiers de déclaration au lieu de `legacy/include/<slug>/` ;

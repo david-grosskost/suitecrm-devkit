@@ -14,6 +14,20 @@ partout :
 - le **plugin Claude** [`suitecrm-extensions`](plugins/suitecrm-extensions/README.md), qui
   guide la création d'une extension, même sans connaissance technique.
 
+## Créer une extension avec Claude
+
+Avant tout dépôt d'extension, installer le plugin une fois par poste. Dans Claude Code, dans
+la zone de saisie (pas dans un terminal) :
+
+```text
+/plugin marketplace add david-grosskost/suitecrm-devkit
+/plugin install suitecrm-extensions@suitecrm-devkit
+```
+
+Puis décrire le besoin en mots métier (« je voudrais que… ») : le skill `nouvelle-extension`
+mène l'entretien et la suite. Dans l'application Claude, le plugin s'ajoute au catalogue de
+l'organisation (voir le [README du plugin](plugins/suitecrm-extensions/README.md)).
+
 Une correction faite ici profite à tous les projets : ils la reçoivent en montant la
 version du devkit.
 
