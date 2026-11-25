@@ -9,7 +9,7 @@ APP_ENV ?=
 SERVICE ?= app
 export APP_ENV SERVICE
 
-.PHONY: app@check app@install app@start app@stop app@restart app@status app@logs app@update app@config
+.PHONY: app@check app@install app@start app@stop app@restart app@status app@logs app@update app@repair app@config
 
 app@check:
 	@$(APP_SCRIPTS)/app/check.sh
@@ -34,6 +34,9 @@ app@logs:
 
 app@update:
 	@$(APP_SCRIPTS)/app/update.sh
+
+app@repair:
+	@$(APP_SCRIPTS)/app/repair.sh
 
 app@config:
 	@$(APP_SCRIPTS)/app/config.sh
