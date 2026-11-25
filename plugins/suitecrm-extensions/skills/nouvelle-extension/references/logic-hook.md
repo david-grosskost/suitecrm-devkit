@@ -39,3 +39,10 @@ voient pas (l'autoload de Composer charge tout).
   `public function <methode>(string $event, mixed $arguments = null): void`
 - Hook de module (avec enregistrement) :
   `public function <methode>(\SugarBean $bean, string $event, mixed $arguments = null): void`
+
+**Les valeurs du `$bean` sont encodées en HTML** pendant l'enregistrement (`o&#039;brien`,
+`dupont &amp; fils`). Pour transformer un texte (majuscules, nettoyage, découpage) :
+décoder (`html_entity_decode($valeur, ENT_QUOTES, 'UTF-8')`), transformer, puis ré-encoder
+(`htmlspecialchars($valeur, ENT_QUOTES, 'UTF-8')`) avant de le remettre dans le `$bean`.
+Transformé tel quel, `&amp;` devient `&AMP;`, que plus rien ne décode. La classe pure
+travaille sur le texte décodé ; le hook décode et ré-encode. Tester les deux formes.
