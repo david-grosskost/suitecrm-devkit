@@ -32,6 +32,15 @@ class Person extends SugarBean
 class User extends Person
 {
     /**
+     * A preference of the user, as SuiteCRM stored it: null when never set.
+     *
+     * @return mixed
+     */
+    public function getPreference(string $name, string $category = 'global')
+    {
+    }
+
+    /**
      * @param mixed $value
      */
     public function setPreference(string $name, $value, int $nosession = 0, string $category = 'global'): void
